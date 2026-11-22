@@ -1,11 +1,11 @@
-# Pipe Riders — App Store setup checklist
+# Tube Riders — App Store setup checklist
 
 ## 1. Apple Developer / ASC
 
 - [ ] Identifiers → App IDs → `com.piperider.game`
 - [ ] Profiles → App Store distribution profile for that ID → download / upload to Codemagic
 - [ ] App Store Connect → New App  
-  - Name: Pipe Riders (or available variant)  
+  - Name: Tube Riders (or available variant)  
   - Bundle ID: com.piperider.game  
   - SKU: piperider-ios  
 - [ ] Copy **Apple ID** (numbers) → set `APP_STORE_APPLE_ID` in `codemagic.yaml` → commit
@@ -14,7 +14,7 @@
 
 - [ ] Application linked to `Rahman-dev-ML/pipe-rider`
 - [ ] App Store Connect integration + signing for `com.piperider.game`
-- [ ] Start workflow **Pipe Riders iOS (App Store)** on `main`
+- [ ] Start workflow **Tube Riders iOS (App Store)** on `main`
 
 ## 3. Listing (after first build)
 

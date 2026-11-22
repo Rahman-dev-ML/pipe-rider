@@ -6,7 +6,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#020208">
-<title>PIPE RIDERS — Ultra 3D Racer</title>
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Tube Riders: a hyper-speed 3D tunnel racer. Steer with one finger, dodge hazards, collect coins.">
+<meta name="apple-mobile-web-app-title" content="Tube Riders">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>TUBE RIDERS — Ultra 3D Racer</title>
 <style>
   :root {
     --sat: env(safe-area-inset-top, 0px);
@@ -266,7 +271,7 @@
   #menu-best { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: rgba(255,230,0,0.75); margin-bottom: 16px; text-align: center; }
   .minimal-hint { font-size: 11px; font-weight: 600; letter-spacing: 2px; color: rgba(255,255,255,0.42); text-transform: uppercase; text-align: center; line-height: 1.8; }
   .hint-touch { display: none; }
-  @media (pointer: coarse) { .hint-touch { display: block; } .hint-desk { display: none; } }
+  .hint-touch { display: block; }   /* Tube Riders is a touch game: menu always shows touch controls */
 
   .game-over-stats { display: flex; gap: clamp(16px, 5vw, 36px); margin-bottom: 26px; flex-wrap: wrap; justify-content: center; }
   .go-stat { text-align: center; min-width: 80px; }
@@ -363,8 +368,8 @@
 <!-- Main Menu -->
 <div class="overlay-screen" id="menu-screen">
   <div class="overlay-inner">
-    <div class="neon-brand">PIPE <span>RIDERS</span></div>
-    <div class="neon-sub">3D Batmobile 360° Hyper Tunnel Racer</div>
+    <div class="neon-brand">TUBE <span>RIDERS</span></div>
+    <div class="neon-sub">3D 360° Hyper Tunnel Racer</div>
 
     <div class="select-label">Game Mode</div>
     <div class="select-row" id="mode-row">
@@ -383,11 +388,6 @@
     <button class="btn-ghost" id="btn-howto" style="margin-bottom:14px;">Practice run</button>
     <div id="menu-best"></div>
 
-    <div class="minimal-hint hint-desk">
-      ← → or A D : steer 360° around the pipe<br>
-      ↑ W : accelerate &bull; ↓ S : brake &bull; Space : nitro &bull; Esc : pause<br>
-      Every 10 coins restores shield
-    </div>
     <div class="minimal-hint hint-touch">
       Touch and drag to steer &bull; drag up / down for speed<br>
       Double-tap for nitro<br>
@@ -728,7 +728,7 @@ scene.add(streakMesh);
 // ═══════════════════════════════════════════════════════════
 // SECTION 4: PLAYER VEHICLE
 // ═══════════════════════════════════════════════════════════
-function createBatmobile() {
+function createHoverCar() {
   const group = new THREE.Group();
   const armorMat = new THREE.MeshStandardMaterial({ color: 0x3a4660, roughness: 0.5, metalness: 0.45, flatShading: true, emissive: 0x0c1830, emissiveIntensity: 0.9 });
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.2, metalness: 0.95 });
@@ -804,8 +804,8 @@ function createBatmobile() {
   group.userData = { flame, coreFlame, underglow, beamCone, neonAccentMat, canopyMat, rimMat, flameMat, wheels };
   return group;
 }
-const playerBatmobile = createBatmobile();
-scene.add(playerBatmobile);
+const playerCar = createHoverCar();
+scene.add(playerCar);
 
 
 // ═══════════════════════════════════════════════════════════
@@ -1346,7 +1346,7 @@ const Game = {
   hudAcc: 0, bestScore: 0, runToken: 0, prevAngle: 0, coins: 0
 };
 
-function bestKey(mode) { return 'piperiders_best_' + mode; }
+function bestKey(mode) { return 'tuberiders_best_' + mode; }
 function readBest(mode) { try { return parseInt(localStorage.getItem(bestKey(mode)), 10) || 0; } catch (e) { return 0; } }
 function writeBest(mode, v) { try { localStorage.setItem(bestKey(mode), String(v)); } catch (e) {} }
 function updateMenuBest() {
@@ -1606,7 +1606,7 @@ function applyBiomeColors(fromIdx, toIdx, t) {
   renderer.setClearColor(_cA);
   curPrimary.setHex(A.primary).lerp(_cB.setHex(B.primary), t);
   hemiLight.color.copy(curPrimary);
-  const ud = playerBatmobile.userData;
+  const ud = playerCar.userData;
   ud.underglow.color.copy(curPrimary);
   ud.neonAccentMat.color.copy(curPrimary);
   ud.canopyMat.color.copy(curPrimary);
@@ -1834,7 +1834,7 @@ function update(dt) {
 }
 
 function updateVehicleAndCamera(dt, steer, isAccel, effMax, deltaDist) {
-  const car = playerBatmobile, ud = car.userData;
+  const car = playerCar, ud = car.userData;
   car.position.set(Math.sin(Game.angle) * CAR_RADIUS, -Math.cos(Game.angle) * CAR_RADIUS, -CAR_Z);
   car.rotation.z = Game.angle - steer * 0.35;
   car.rotation.x = (Game.speed / effMax) * 0.08;
@@ -2062,7 +2062,7 @@ function endRun(reason) {
 }
 
 // ── In-game coach: teaches the controls while you play (never blocks the start) ──
-const COACH_KEY = 'piperiders_coach_v2';
+const COACH_KEY = 'tuberiders_coach_v2';
 function coachSeen() { try { return localStorage.getItem(COACH_KEY) === '1'; } catch (e) { return true; } }
 function markCoachSeen() { try { localStorage.setItem(COACH_KEY, '1'); } catch (e) {} }
 const Coach = { on: false, shown: false, step: 0, t: 0, steerT: 0, speedT: 0, coinBase: 0, forced: false };
@@ -2156,7 +2156,7 @@ function perfTick(rawDt) {
 }
 
 // Idle pose for the menu
-playerBatmobile.position.set(0, -CAR_RADIUS, -CAR_Z);
+playerCar.position.set(0, -CAR_RADIUS, -CAR_Z);
 camera.position.set(0, -CAR_RADIUS * 0.58, 0);
 camera.lookAt(0, -CAR_RADIUS * 0.65, -55);
 setBiomeInstant(0);
