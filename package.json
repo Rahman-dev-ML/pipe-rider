@@ -2,7 +2,7 @@
   "name": "pipe-rider",
   "private": true,
   "version": "1.0.0",
-  "description": "Tube Riders — Ultra 3D Racer",
+  "description": "Pipe Turbo — Ultra 3D Racer",
   "scripts": {
     "sync": "npx cap sync",
     "sync:ios": "npx cap sync ios",

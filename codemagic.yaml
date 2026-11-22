@@ -1,10 +1,10 @@
-# Tube Riders — Capacitor 8 iOS (App Store / TestFlight)
+# Pipe Turbo — Capacitor 8 iOS (App Store / TestFlight)
 # Bundle ID: com.piperider.game
 # After creating the app in App Store Connect, set APP_STORE_APPLE_ID below.
 
 workflows:
   pipe-rider-ios:
-    name: Tube Riders iOS (App Store)
+    name: Pipe Turbo iOS (App Store)
     max_build_duration: 120
     instance_type: mac_mini_m2
     integrations:
