@@ -1,0 +1,21 @@
+{
+  "name": "pipe-rider",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pipe Riders — Ultra 3D Racer",
+  "scripts": {
+    "sync": "npx cap sync",
+    "sync:ios": "npx cap sync ios",
+    "open:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}

@@ -1,0 +1,96 @@
+# Pipe Riders — Capacitor 8 iOS (App Store / TestFlight)
+# Bundle ID: com.piperider.game
+# After creating the app in App Store Connect, set APP_STORE_APPLE_ID below.
+
+workflows:
+  pipe-rider-ios:
+    name: Pipe Riders iOS (App Store)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.piperider.game
+      vars:
+        BUNDLE_ID: "com.piperider.game"
+        XCODE_PROJECT: "App.xcodeproj"
+        XCODE_SCHEME: "App"
+        # App Store Connect → App Information → Apple ID (numeric)
+        APP_STORE_APPLE_ID: 0
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm ci || npm install
+      - name: Sync Capacitor iOS
+        script: |
+          npx cap sync ios
+      - name: Force brand AppIcon after cap sync
+        script: |
+          set -e
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          try:
+              from PIL import Image
+          except ImportError:
+              subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow", "-q"])
+              from PIL import Image
+          root = Path(os.environ["CM_BUILD_DIR"])
+          dest = root / "ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          src = root / "assets/AppIcon-1024.png"
+          assert src.exists(), src
+          out = dest / "AppIcon-512@2x.png"
+          Image.open(src).convert("RGB").resize((1024, 1024), Image.Resampling.LANCZOS).save(out, "PNG")
+          (dest / "Contents.json").write_text(json.dumps({
+              "images": [{"filename": "AppIcon-512@2x.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"}],
+              "info": {"author": "xcode", "version": 1},
+          }, indent=2), encoding="utf-8")
+          print("Forced AppIcon", out, out.stat().st_size)
+          PY
+      - name: Set encryption flag
+        script: |
+          PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$PLIST"
+      - name: Set up code signing profiles
+        script: xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          set -e
+          cd $CM_BUILD_DIR/ios/App
+          LATEST_TF=$(app-store-connect get-latest-testflight-build-number --platform IOS "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          LATEST_AS=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          UPDATED_BUILD_NUMBER=$(python3 - <<PY
+          vals = []
+          for raw in ["$LATEST_TF", "$LATEST_AS", "${BUILD_NUMBER:-1}"]:
+              raw = (raw or "").strip()
+              if raw.isdigit():
+                  vals.append(int(raw))
+          print(max(vals) + 1 if vals else 1)
+          PY
+          )
+          echo "TF=$LATEST_TF AS=$LATEST_AS → build=$UPDATED_BUILD_NUMBER"
+          agvtool new-version -all "$UPDATED_BUILD_NUMBER"
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/ios/App/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+          mkdir -p "$CM_BUILD_DIR/build/ios/ipa"
+          find "$CM_BUILD_DIR" -type f -name "*.ipa" -print
+          find "$CM_BUILD_DIR" -type f -name "*.ipa" -exec cp -f {} "$CM_BUILD_DIR/build/ios/ipa/" \;
+          ls -la "$CM_BUILD_DIR/build/ios/ipa"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - ios/**/ipa/*.ipa
+      - "**/*.ipa"
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

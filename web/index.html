@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#020208">
+<title>PIPE RIDERS — Ultra 3D Racer</title>
+<style>
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --accent: #00f0ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #020208;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    touch-action: none; overscroll-behavior: none;
+  }
+  #webgl-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+
+  /* ═════════════ HUD ═════════════ */
+  #hud-layer { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #hud-layer.active { display: block; }
+
+  .top-hud {
+    position: absolute;
+    top: calc(var(--sat) + 18px); left: calc(var(--sal) + 20px); right: calc(var(--sar) + 20px);
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .hud-stat-group { display: flex; flex-direction: column; }
+  .hud-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 3px;
+    color: rgba(255,255,255,0.5); text-transform: uppercase;
+  }
+  .hud-value-large {
+    font-size: clamp(22px, 4.4vw, 34px); font-weight: 900; color: #fff;
+    font-variant-numeric: tabular-nums; letter-spacing: 1px;
+    text-shadow: 0 0 14px rgba(0,240,255,0.6); line-height: 1; margin-top: 4px;
+  }
+  #combo-tag {
+    margin-top: 6px; font-size: 12px; font-weight: 900; letter-spacing: 2px;
+    color: #ff9500; text-shadow: 0 0 10px #ff6a00; opacity: 0; transition: opacity 0.15s;
+  }
+  #combo-tag.on { opacity: 1; }
+
+  #biome-tag {
+    position: absolute; top: calc(var(--sat) + 22px); left: 50%; transform: translateX(-50%);
+    font-size: 11px; font-weight: 800; letter-spacing: 4px; white-space: nowrap;
+    padding: 7px 20px; border-radius: 20px;
+    background: rgba(6,10,20,0.85); border: 1px solid var(--accent);
+    color: var(--accent); text-transform: uppercase;
+  }
+
+  #timer-capsule {
+    position: absolute; top: calc(var(--sat) + 62px); left: 50%; transform: translateX(-50%);
+    display: none; flex-direction: column; align-items: center;
+  }
+  #timer-capsule.active { display: flex; }
+  #hud-timer {
+    font-size: clamp(32px, 6vw, 44px); font-weight: 900; color: #fff;
+    font-variant-numeric: tabular-nums; line-height: 1;
+    text-shadow: 0 0 18px rgba(255,255,255,0.45);
+  }
+  #hud-timer.danger { color: #ff0044; text-shadow: 0 0 18px #ff0044; animation: pulse-scale 0.5s infinite alternate; }
+  @keyframes pulse-scale { from { transform: scale(1); } to { transform: scale(1.14); } }
+
+  .shield-capsule { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .shield-track { width: clamp(90px, 20vw, 150px); height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; }
+  .shield-glow-fill {
+    height: 100%; width: 100%; background: #00ffaa; border-radius: 4px;
+    box-shadow: 0 0 10px #00ffaa;
+    transform-origin: left center; transition: transform 0.15s ease-out, background 0.25s;
+  }
+  .shield-glow-fill.danger { background: #ff0055; box-shadow: 0 0 12px #ff0055; }
+
+  .bottom-hud {
+    position: absolute;
+    bottom: calc(var(--sab) + 20px); left: calc(var(--sal) + 20px); right: calc(var(--sar) + 20px);
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .speed-display { display: flex; align-items: baseline; gap: 6px; }
+  .speed-val {
+    font-size: clamp(28px, 5.4vw, 42px); font-weight: 900; color: var(--accent);
+    text-shadow: 0 0 16px rgba(0,240,255,0.7); font-variant-numeric: tabular-nums;
+  }
+  .speed-val.redline { color: #ff0044; text-shadow: 0 0 16px #ff0044; }
+  .speed-unit { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: rgba(0,240,255,0.65); }
+
+  #action-alert {
+    position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(16px, 3.6vw, 24px); font-weight: 900; letter-spacing: clamp(2px, 0.8vw, 6px);
+    color: #ffe600; text-shadow: 0 0 16px #ffe600;
+    opacity: 0; transition: opacity 0.15s, transform 0.15s;
+    text-transform: uppercase; text-align: center; white-space: nowrap;
+  }
+  #action-alert.active { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+
+  #hazard-beacon {
+    position: absolute; top: 19%; left: 50%; transform: translateX(-50%);
+    font-size: clamp(12px, 2.6vw, 16px); font-weight: 900; letter-spacing: 4px; white-space: nowrap;
+    padding: 8px 22px; border-radius: 8px;
+    color: #ff2222; border: 2px solid #ff2222; background: rgba(40,0,0,0.6);
+    text-shadow: 0 0 12px #ff0000; opacity: 0; text-transform: uppercase;
+  }
+  #hazard-beacon.show { animation: blink 0.36s infinite alternate; }
+  @keyframes blink { from { opacity: 1; } to { opacity: 0.25; } }
+
+  #zone-announcement {
+    position: absolute; top: 28%; left: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(20px, 5vw, 44px); font-weight: 900; letter-spacing: clamp(4px, 1.4vw, 12px);
+    color: #fff; text-align: center; white-space: nowrap;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    text-shadow: 0 0 24px var(--accent); text-transform: uppercase;
+  }
+  #zone-announcement.show { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+
+  #countdown {
+    position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(64px, min(18vw, 26vh), 150px); font-weight: 900; color: #fff;
+    text-shadow: 0 0 30px var(--accent), 0 0 70px var(--accent); opacity: 0;
+  }
+  #countdown.pop { animation: cd-pop 0.9s ease-out forwards; }
+  @keyframes cd-pop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+    18%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    75%  { opacity: 1; transform: translate(-50%, -50%) scale(0.94); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  }
+
+  /* Screen FX (opacity/transform only = compositor-cheap) */
+  .fx { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+  #impact-flash { background: rgba(255,0,60,0.45); z-index: 15; transition: opacity 0.08s; }
+  #impact-flash.hit { opacity: 1; }
+  #shield-flash { background: rgba(0,255,170,0.25); z-index: 15; transition: opacity 0.1s; }
+  #shield-flash.flash { opacity: 1; }
+  #speed-vignette { z-index: 11; background: radial-gradient(ellipse at center, transparent 48%, rgba(0,0,0,0.75) 100%); }
+  #danger-vignette { z-index: 12; background: radial-gradient(ellipse at center, transparent 45%, rgba(255,0,40,0.6) 100%); }
+  #danger-vignette.on { animation: danger-pulse 0.75s infinite alternate; }
+  @keyframes danger-pulse { from { opacity: 0.25; } to { opacity: 0.9; } }
+  #shave-flash { z-index: 13; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,150,0,0.5) 100%); transition: opacity 0.25s; }
+  #shave-flash.on { opacity: 1; transition: opacity 0.04s; }
+
+  #spark-burst { position: fixed; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; z-index: 16; }
+  #spark-burst span {
+    position: absolute; width: 5px; height: 5px; border-radius: 50%;
+    background: #ffe600; box-shadow: 0 0 8px #ff8800; opacity: 0;
+  }
+  #spark-burst.burst span { animation: spark-fly 0.55s cubic-bezier(0.1,0.8,0.3,1) forwards; }
+  @keyframes spark-fly {
+    0%   { opacity: 1; transform: translate(0,0) scale(1.4); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); }
+  }
+
+  /* ═════════════ TOUCH UI ═════════════ */
+  #touch-zones { position: fixed; inset: 0; z-index: 20; display: none; }
+  #touch-zones.active { display: flex; }
+  /* Floating analog stick — appears under the thumb wherever you touch */
+  #stick-base, #stick-knob {
+    position: fixed; left: 0; top: 0; border-radius: 50%; pointer-events: none;
+    z-index: 22; opacity: 0; transition: opacity 0.12s;
+  }
+  #stick-base {
+    width: 150px; height: 150px; margin: -75px 0 0 -75px;
+    border: 2px solid rgba(0,240,255,0.35); background: rgba(0,240,255,0.06);
+  }
+  #stick-knob {
+    width: 60px; height: 60px; margin: -30px 0 0 -30px;
+    background: radial-gradient(circle, rgba(0,240,255,0.95) 0%, rgba(0,240,255,0.3) 75%);
+    box-shadow: 0 0 18px rgba(0,240,255,0.7);
+  }
+  #stick-base.on, #stick-knob.on { opacity: 1; }
+
+  /* In-game coach: prompts that advance as you perform each action */
+  #coach {
+    position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(14px, 3.6vw, 22px); font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
+    color: #fff; text-align: center; white-space: nowrap; pointer-events: none;
+    padding: 10px 18px; border-radius: 12px; background: rgba(6,10,20,0.6);
+    border: 1px solid var(--accent); text-shadow: 0 0 12px var(--accent);
+    opacity: 0; transition: opacity 0.25s;
+  }
+  #coach.show { opacity: 1; }
+  #coach small { display: block; font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: rgba(255,255,255,0.7); margin-top: 4px; text-shadow: none; }
+
+  #touch-ui { position: fixed; inset: 0; z-index: 30; pointer-events: none; display: none; }
+  #touch-ui.active { display: block; }
+  .tbtn {
+    position: absolute; pointer-events: auto; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; font-weight: 900; color: #fff;
+    background: rgba(6,10,20,0.6); border: 2px solid rgba(255,255,255,0.3);
+  }
+  #btn-pause {
+    top: calc(var(--sat) + 14px); left: 50%; transform: translateX(-50%);
+    width: 42px; height: 42px; font-size: 14px; letter-spacing: 1px;
+  }
+  #btn-nitro {
+    bottom: calc(var(--sab) + 18px); left: 50%; transform: translateX(-50%);
+    width: 78px; height: 78px; font-size: 11px; letter-spacing: 1px; flex-direction: column;
+    opacity: 0.4;
+  }
+  #btn-nitro span { font-size: 24px; line-height: 1; }
+  #btn-nitro.ready { opacity: 1; border-color: #ffe600; color: #ffe600; box-shadow: 0 0 18px rgba(255,230,0,0.55); }
+  #btn-nitro.pressed { transform: translateX(-50%) scale(0.9); }
+
+  /* ═════════════ OVERLAYS ═════════════ */
+  .overlay-screen {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    background: radial-gradient(circle at center, rgba(6,9,18,0.88) 0%, rgba(2,2,8,0.97) 100%);
+    padding: calc(var(--sat) + 20px) calc(var(--sar) + 14px) calc(var(--sab) + 20px) calc(var(--sal) + 14px);
+  }
+  .overlay-screen.hidden { display: none; }
+  .overlay-inner { margin: auto; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 640px; }
+
+  .neon-brand {
+    font-size: clamp(36px, 9vw, 76px); font-weight: 900;
+    letter-spacing: clamp(4px, 1.4vw, 8px); text-transform: uppercase; color: #fff;
+    text-shadow: 0 0 20px rgba(0,240,255,0.8), 0 0 50px rgba(0,240,255,0.35);
+    margin-bottom: 6px; text-align: center; line-height: 1;
+  }
+  .neon-brand span { color: #00f0ff; }
+  .neon-sub {
+    font-size: clamp(9px, 2.2vw, 12px); font-weight: 700; letter-spacing: clamp(2px, 1vw, 6px);
+    color: rgba(255,255,255,0.55); text-transform: uppercase; margin-bottom: 24px; text-align: center;
+  }
+  .select-label { font-size: 10px; font-weight: 800; letter-spacing: 4px; color: rgba(255,255,255,0.45); text-transform: uppercase; margin-bottom: 10px; }
+  .select-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; width: 100%; }
+  .select-btn {
+    padding: 13px 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px;
+    text-transform: uppercase; border-radius: 12px; cursor: pointer; touch-action: manipulation;
+    background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.18); transition: all 0.15s ease;
+    text-align: center; min-width: 130px; font-family: inherit;
+  }
+  .select-btn small { display: block; font-size: 9px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.45); margin-top: 4px; text-transform: none; }
+  .select-btn:hover { border-color: rgba(0,240,255,0.6); color: #fff; }
+  .select-btn.selected { background: rgba(0,240,255,0.12); color: #00f0ff; border-color: #00f0ff; box-shadow: 0 0 16px rgba(0,240,255,0.4); }
+  .select-btn.selected small { color: rgba(0,240,255,0.75); }
+
+  .btn-play {
+    padding: 18px 54px; font-size: 15px; font-weight: 900; letter-spacing: 4px; font-family: inherit;
+    text-transform: uppercase; border-radius: 40px; cursor: pointer; touch-action: manipulation;
+    background: #00f0ff; color: #020208; border: none;
+    box-shadow: 0 0 28px rgba(0,240,255,0.75); transition: transform 0.15s, box-shadow 0.15s;
+    margin-bottom: 18px;
+  }
+  .btn-play:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 0 44px rgba(0,240,255,1); }
+  .btn-play:active { transform: scale(0.97); }
+  .btn-ghost {
+    padding: 12px 28px; font-size: 11px; font-weight: 800; letter-spacing: 3px; font-family: inherit;
+    text-transform: uppercase; border-radius: 30px; cursor: pointer; touch-action: manipulation;
+    background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.28);
+    margin: 4px;
+  }
+  .btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.65); }
+
+  #menu-best { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: rgba(255,230,0,0.75); margin-bottom: 16px; text-align: center; }
+  .minimal-hint { font-size: 11px; font-weight: 600; letter-spacing: 2px; color: rgba(255,255,255,0.42); text-transform: uppercase; text-align: center; line-height: 1.8; }
+  .hint-touch { display: none; }
+  @media (pointer: coarse) { .hint-touch { display: block; } .hint-desk { display: none; } }
+
+  .game-over-stats { display: flex; gap: clamp(16px, 5vw, 36px); margin-bottom: 26px; flex-wrap: wrap; justify-content: center; }
+  .go-stat { text-align: center; min-width: 80px; }
+  .go-stat .label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.45); letter-spacing: 2px; }
+  .go-stat .val { font-size: clamp(24px, 6vw, 36px); font-weight: 900; color: #00f0ff; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  #new-best { font-size: 13px; font-weight: 900; letter-spacing: 5px; color: #ffe600; text-shadow: 0 0 14px #ffe600; margin-bottom: 18px; display: none; animation: blink 0.5s infinite alternate; }
+  #new-best.show { display: block; }
+
+  /* ═════════════ RESPONSIVE ═════════════ */
+  @media (pointer: coarse), (max-width: 700px) {
+    #biome-tag { display: none; }
+    #timer-capsule { top: calc(var(--sat) + 64px); }
+  }
+  @media (max-width: 480px) {
+    .select-btn { min-width: 0; flex: 1 1 42%; padding: 11px 8px; font-size: 11px; letter-spacing: 1px; }
+    .btn-play { padding: 16px 44px; }
+    .top-hud { top: calc(var(--sat) + 14px); left: calc(var(--sal) + 14px); right: calc(var(--sar) + 14px); }
+    .bottom-hud { left: calc(var(--sal) + 14px); right: calc(var(--sar) + 14px); }
+    .hud-label { letter-spacing: 2px; }
+  }
+  @media (max-height: 520px) {
+    .neon-brand { font-size: 34px; }
+    .neon-sub { margin-bottom: 12px; }
+    .select-row { margin-bottom: 10px; }
+    .select-btn { padding: 8px 14px; }
+    .select-btn small { display: none; }
+    .btn-play { padding: 12px 40px; margin-bottom: 10px; }
+    .minimal-hint { font-size: 9px; line-height: 1.6; }
+    #btn-nitro { width: 66px; height: 66px; }
+  }
+</style>
+
+<script src="three.min.js"></script>
+<script>
+  if (typeof THREE === 'undefined') {
+    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+  }
+</script>
+</head>
+<body>
+
+<canvas id="webgl-canvas"></canvas>
+
+<div id="speed-vignette" class="fx"></div>
+<div id="danger-vignette" class="fx"></div>
+<div id="shave-flash" class="fx"></div>
+<div id="impact-flash" class="fx"></div>
+<div id="shield-flash" class="fx"></div>
+<div id="spark-burst"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
+<div id="hud-layer">
+  <div id="biome-tag">ZONE 1: CYBER SYNTHWAVE</div>
+  <div id="timer-capsule">
+    <div class="hud-label" style="text-align:center;">TIME</div>
+    <div id="hud-timer">90</div>
+  </div>
+
+  <div class="top-hud">
+    <div class="hud-stat-group">
+      <div class="hud-label">SCORE</div>
+      <div class="hud-value-large" id="hud-score">0</div>
+      <div id="combo-tag">COMBO x2</div>
+    </div>
+    <div class="shield-capsule">
+      <div class="hud-label">SHIELD</div>
+      <div class="shield-track"><div class="shield-glow-fill" id="hud-shield"></div></div>
+      <div class="hud-label" id="hud-coins" style="margin-top:4px;color:#ffe600;">💎 0</div>
+    </div>
+  </div>
+
+  <div id="hazard-beacon">⚠️ HAZARD AHEAD ⚠️</div>
+  <div id="coach"></div>
+  <div id="action-alert"></div>
+  <div id="zone-announcement"></div>
+  <div id="countdown"></div>
+
+  <div class="bottom-hud">
+    <div class="hud-stat-group">
+      <div class="hud-label">DISTANCE</div>
+      <div class="hud-value-large" style="font-size:clamp(18px,3.4vw,26px); text-shadow:none; color:rgba(255,255,255,0.88);" id="hud-distance">0 m</div>
+    </div>
+    <div class="speed-display">
+      <div class="speed-val" id="hud-speed">280</div>
+      <div class="speed-unit">KM/H</div>
+    </div>
+  </div>
+</div>
+
+<div id="touch-zones"></div>
+<div id="stick-base"></div>
+<div id="stick-knob"></div>
+<!-- Touch is fully gesture-driven: no on-screen buttons -->
+
+<!-- Main Menu -->
+<div class="overlay-screen" id="menu-screen">
+  <div class="overlay-inner">
+    <div class="neon-brand">PIPE <span>RIDERS</span></div>
+    <div class="neon-sub">3D Batmobile 360° Hyper Tunnel Racer</div>
+
+    <div class="select-label">Game Mode</div>
+    <div class="select-row" id="mode-row">
+      <button class="select-btn selected" data-mode="endless">💀 Endless Survival<small>Speed ramps up &bull; shield regen</small></button>
+      <button class="select-btn" data-mode="sprint">🏁 Timed Sprint<small>90s clock &bull; checkpoints +20s</small></button>
+    </div>
+
+    <div class="select-label">Speed Tier</div>
+    <div class="select-row" id="tier-row">
+      <button class="select-btn selected" data-tier="normal">Normal<small>Balanced</small></button>
+      <button class="select-btn" data-tier="fast">Fast<small>High thrills</small></button>
+      <button class="select-btn" data-tier="hyper">Hyper<small>Insane reflexes</small></button>
+    </div>
+
+    <button class="btn-play" id="btn-start">Start Race</button>
+    <button class="btn-ghost" id="btn-howto" style="margin-bottom:14px;">Practice run</button>
+    <div id="menu-best"></div>
+
+    <div class="minimal-hint hint-desk">
+      ← → or A D : steer 360° around the pipe<br>
+      ↑ W : accelerate &bull; ↓ S : brake &bull; Space : nitro &bull; Esc : pause<br>
+      Every 10 coins restores shield
+    </div>
+    <div class="minimal-hint hint-touch">
+      Touch and drag to steer &bull; drag up / down for speed<br>
+      Double-tap for nitro<br>
+      Two-finger tap pauses<br>
+      Every 10 coins restores shield
+    </div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div class="overlay-screen hidden" id="pause-screen">
+  <div class="overlay-inner">
+    <div class="neon-brand" style="font-size:clamp(34px,8vw,60px); margin-bottom:26px;">PAUSED</div>
+    <button class="btn-play" id="btn-resume">Resume</button>
+    <div>
+      <button class="btn-ghost" id="btn-pause-restart">Restart</button>
+      <button class="btn-ghost" id="btn-pause-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="overlay-screen hidden" id="gameover-screen">
+  <div class="overlay-inner">
+    <div class="neon-brand" id="gameover-title" style="font-size:clamp(34px,8vw,64px); margin-bottom:14px;">CRASHED</div>
+    <div id="new-best">★ NEW BEST ★</div>
+    <div class="game-over-stats">
+      <div class="go-stat"><div class="label">DISTANCE</div><div class="val" id="res-dist">0 m</div></div>
+      <div class="go-stat"><div class="label">SCORE</div><div class="val" id="res-score" style="color:#00ffaa;">0</div></div>
+      <div class="go-stat"><div class="label">CLOSE SHAVES</div><div class="val" id="res-shaves" style="color:#ff9500;">0</div></div>
+      <div class="go-stat"><div class="label">BEST</div><div class="val" id="res-best" style="color:#ffe600;">0</div></div>
+    </div>
+    <button class="btn-play" id="btn-restart">Play Again</button>
+    <button class="btn-ghost" id="btn-menu">Change Mode</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 0: PLATFORM & CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+const DPR = window.devicePixelRatio || 1;
+function haptic(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+const TAU = Math.PI * 2;
+const HALF_PI = Math.PI / 2;
+
+const PIPE_RADIUS = 12.0;
+const TOTAL_DEPTH = 540;
+
+const CAR_RADIUS = PIPE_RADIUS - 1.15;      // r ≈ 10.85 — car rides the wall
+const CAR_Z = 11.0;                          // car collision plane (world z = -11)
+const CAR_Z_NEAR = 12.4;
+const CAR_Z_FAR = 9.6;
+const CAR_HALF_ANGLE = 1.15 / CAR_RADIUS;    // angular half-width of the car
+const CAR_RADIAL_MIN = CAR_RADIUS - 1.6;
+const CAR_RADIAL_MAX = PIPE_RADIUS;
+
+const NEAR_MISS_RAD = 0.5;
+
+function wrapPI(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
+function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 1: WEB AUDIO — ENGINE SYNTH + SFX
+// ═══════════════════════════════════════════════════════════
+class RealisticCarAudio {
+  constructor() { this.ctx = null; this.active = false; this._lastSet = 0; }
+
+  init() {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      this.active = true;
+      return;
+    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = this.ctx = new AudioCtx();
+    const t0 = ctx.currentTime;
+
+    this.masterGain = ctx.createGain();
+    this.masterGain.gain.setValueAtTime(0.001, t0);
+    this.masterGain.connect(ctx.destination);
+
+    // SFX bus with a soft limiter so stacked effects never clip
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-10, t0);
+    comp.ratio.setValueAtTime(6, t0);
+    comp.connect(ctx.destination);
+    this.sfx = ctx.createGain();
+    this.sfx.gain.setValueAtTime(1, t0);
+    this.sfx.connect(comp);
+
+    // 1. Detuned sub-bass combustion thrum
+    this.sub1 = ctx.createOscillator(); this.sub1.type = 'sawtooth';
+    this.sub2 = ctx.createOscillator(); this.sub2.type = 'triangle';
+    this.sub1.frequency.setValueAtTime(46, t0);
+    this.sub2.frequency.setValueAtTime(47.4, t0);
+    const subFilter = ctx.createBiquadFilter();
+    subFilter.type = 'lowpass'; subFilter.frequency.setValueAtTime(150, t0);
+    this.subGain = ctx.createGain(); this.subGain.gain.setValueAtTime(0.25, t0);
+    this.sub1.connect(subFilter); this.sub2.connect(subFilter);
+    subFilter.connect(this.subGain); this.subGain.connect(this.masterGain);
+
+    // 2. Turbine whine
+    this.turbine = ctx.createOscillator(); this.turbine.type = 'sawtooth';
+    this.turbine.frequency.setValueAtTime(180, t0);
+    const turbFilter = ctx.createBiquadFilter();
+    turbFilter.type = 'bandpass'; turbFilter.frequency.setValueAtTime(620, t0); turbFilter.Q.setValueAtTime(4.5, t0);
+    this.turbineGain = ctx.createGain(); this.turbineGain.gain.setValueAtTime(0.06, t0);
+    this.turbine.connect(turbFilter); turbFilter.connect(this.turbineGain); this.turbineGain.connect(this.masterGain);
+
+    // 3. Air rush (looped pink noise)
+    const bufferSize = ctx.sampleRate * 2;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const out = noiseBuffer.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      out[i] = b0 + b1 + b2;
+    }
+    this.noiseBuffer = noiseBuffer;
+    this.exhaustNoiseNode = ctx.createBufferSource();
+    this.exhaustNoiseNode.buffer = noiseBuffer; this.exhaustNoiseNode.loop = true;
+    this.exhaustFilter = ctx.createBiquadFilter();
+    this.exhaustFilter.type = 'lowpass'; this.exhaustFilter.frequency.setValueAtTime(240, t0);
+    this.exhaustGain = ctx.createGain(); this.exhaustGain.gain.setValueAtTime(0.04, t0);
+    this.exhaustNoiseNode.connect(this.exhaustFilter); this.exhaustFilter.connect(this.exhaustGain); this.exhaustGain.connect(this.masterGain);
+
+    this.sub1.start(); this.sub2.start(); this.turbine.start(); this.exhaustNoiseNode.start();
+    this.active = true;
+  }
+
+  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+
+  // Pitch tied to velocity: growl at ~200 km/h → turbine shriek at 600+. Throttled to 25Hz.
+  setThrottle(f, isAccel, isBoost) {
+    if (!this.ctx || !this.active) return;
+    const now = this.ctx.currentTime;
+    if (now - this._lastSet < 0.04) return;
+    this._lastSet = now;
+    this.masterGain.gain.setTargetAtTime(0.45, now, 0.05);
+    const rpm = 52 + f * 98;
+    this.sub1.frequency.setTargetAtTime(rpm, now, 0.04);
+    this.sub2.frequency.setTargetAtTime(rpm * 1.028, now, 0.04);
+    this.turbine.frequency.setTargetAtTime(220 + f * f * 1400 + (isBoost ? 420 : 0), now, 0.05);
+    this.exhaustFilter.frequency.setTargetAtTime(300 + f * 950 + (isAccel ? 320 : 0), now, 0.05);
+    this.subGain.gain.setTargetAtTime(0.24 + (isAccel ? 0.09 : 0), now, 0.05);
+    this.exhaustGain.gain.setTargetAtTime(0.05 + f * 0.09, now, 0.05);
+  }
+
+  stop() {
+    if (this.masterGain && this.ctx) this.masterGain.gain.setTargetAtTime(0.001, this.ctx.currentTime, 0.08);
+  }
+
+  _tone(type, freq, start, dur, vol, endFreq) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, start);
+    if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, start + dur);
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    o.connect(g); g.connect(this.sfx);
+    o.start(start); o.stop(start + dur + 0.02);
+  }
+  _noise(start, dur, vol, type, freq, freqEnd) {
+    if (!this.noiseBuffer) return;
+    const ctx = this.ctx;
+    const n = ctx.createBufferSource(); n.buffer = this.noiseBuffer;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, start);
+    if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, start + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, start); g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    n.connect(f); f.connect(g); g.connect(this.sfx);
+    n.start(start, Math.random()); n.stop(start + dur + 0.02);
+  }
+
+  playCoin() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('sine', 987.77, t, 0.25, 0.22); this._tone('sine', 1318.51, t + 0.06, 0.28, 0.22); }
+  playShield() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    [523.25, 659.25, 1046.5].forEach((f, i) => this._tone('triangle', f, t + i * 0.05, 0.35, 0.2)); }
+  playCheckpoint() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    [659.25, 880, 1174.66, 1567.98].forEach((f, i) => this._tone('triangle', f, t + i * 0.07, 0.4, 0.22)); }
+  playBoost() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('sawtooth', 140, t, 0.55, 0.3, 880); this._noise(t, 0.6, 0.25, 'bandpass', 600, 4000); }
+
+  // Metallic clang: thud + inharmonic ringing partials + noise crack
+  playHit() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('sawtooth', 190, t, 0.32, 0.45, 25);
+    [817, 1233, 2094, 2843].forEach((f, i) => this._tone('sine', f * (1 + Math.random() * 0.02), t, 0.22 + i * 0.06, 0.13 / (i + 1)));
+    this._noise(t, 0.12, 0.3, 'highpass', 1800); }
+
+  // Near-miss: rising air-slice swish + bright two-note chime (reads as "you just dodged")
+  playWhoosh() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._noise(t, 0.3, 0.32, 'bandpass', 380, 4200);
+    this._tone('triangle', 1046.5, t + 0.1, 0.32, 0.2);
+    this._tone('sine', 1568, t + 0.15, 0.42, 0.15); }
+
+  playTick(high) { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('sine', high ? 1320 : 660, t, high ? 0.45 : 0.16, 0.25); }
+
+  playWarn() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('square', 740, t, 0.09, 0.07); this._tone('square', 520, t + 0.11, 0.1, 0.07); }
+
+  playAlarm() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('square', 920, t, 0.12, 0.07); this._tone('square', 920, t + 0.16, 0.12, 0.07); }
+
+  playHeartbeat() { if (!this.ctx) return; const t = this.ctx.currentTime;
+    this._tone('sine', 62, t, 0.16, 0.55, 40); this._tone('sine', 55, t + 0.19, 0.2, 0.42, 36); }
+}
+const audio = new RealisticCarAudio();
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 2: BIOMES
+// ═══════════════════════════════════════════════════════════
+const BIOMES = [
+  { name: 'ZONE 1: CYBER SYNTHWAVE', primary: 0x00f0ff, fog: 0x020208, pipeBg: '#050614', gridCol: '#00f0ff', railCol: '#ff0077' },
+  { name: 'ZONE 2: SOLAR MAGMA',     primary: 0xff6600, fog: 0x140400, pipeBg: '#120400', gridCol: '#ff4400', railCol: '#ffcc00' },
+  { name: 'ZONE 3: MATRIX ACID',     primary: 0x00ff66, fog: 0x010903, pipeBg: '#021005', gridCol: '#00ff66', railCol: '#00ffcc' },
+  { name: 'ZONE 4: HYPER GLACIAL',   primary: 0x33bbff, fog: 0x010612, pipeBg: '#030a1a', gridCol: '#33bbff', railCol: '#ffffff' },
+  { name: 'ZONE 5: QUANTUM VOID',    primary: 0xaa00ff, fog: 0x090012, pipeBg: '#0b0014', gridCol: '#aa00ff', railCol: '#ff0044' }
+];
+const ZONE_DISTANCE_STEP = 300;
+let currentBiomeIdx = 0;
+function hexStr(h) { return '#' + h.toString(16).padStart(6, '0'); }
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 3: RENDERER (adaptive resolution) & SCENE
+// PERFORMANCE RULES used everywhere below:
+//  • Fixed light count (hemi + dir + car underglow) → shaders never recompile.
+//  • Every obstacle geometry/material built ONCE and shared.
+//  • Multi-part obstacles pre-merged into 1–3 draw calls.
+//  • Pixel ratio auto-drops when frames run long, rises back when smooth.
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('webgl-canvas');
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias: !IS_TOUCH && DPR < 1.5, powerPreference: 'high-performance', stencil: false
+});
+const Perf = { max: Math.min(DPR, IS_TOUCH ? 1.5 : 1.75), min: 0.75, ratio: 1, acc: 0, frames: 0, good: 0 };
+Perf.ratio = Perf.max;
+renderer.setPixelRatio(Perf.ratio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(BIOMES[0].fog);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(BIOMES[0].fog, IS_TOUCH ? 0.0028 : 0.0036);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 620);
+
+// Portrait phones: widen vertical FOV so the tunnel doesn't feel like a keyhole
+function baseFov() { const a = camera.aspect; return a >= 1 ? 75 : Math.min(100, 75 + (1 - a) * 46); }
+function speedFovGain() { return camera.aspect >= 1 ? 20 : 11; }
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.fov = baseFov();
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
+onResize();
+
+const hemiLight = new THREE.HemisphereLight(0x00f0ff, 0x110022, 1.2);
+scene.add(hemiLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+dirLight.position.set(0, 14, 8);
+scene.add(dirLight);
+
+// ─── Pre-baked biome tunnel textures (no per-zone canvas redraw hitch) ───
+const MAX_ANISO = Math.min(IS_TOUCH ? 2 : 4, renderer.capabilities.getMaxAnisotropy());
+function makeTubeTexture(b) {
+  const S = 512, k = S / 1024;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = b.pipeBg; g.fillRect(0, 0, S, S);
+
+  g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 1;
+  for (let y = 0; y < 1024; y += 32) { g.beginPath(); g.moveTo(0, y * k); g.lineTo(S, y * k); g.stroke(); }
+
+  const line = (x0, y0, x1, y1) => { g.beginPath(); g.moveTo(x0 * k, y0 * k); g.lineTo(x1 * k, y1 * k); g.stroke(); };
+  g.shadowColor = b.gridCol; g.shadowBlur = 7; g.strokeStyle = b.gridCol; g.lineWidth = 2.5;
+  for (let y = 0; y <= 1024; y += 256) line(0, y, 1024, y);
+  g.shadowColor = b.railCol; g.shadowBlur = 9; g.strokeStyle = b.railCol; g.lineWidth = 3.5;
+  for (let x = 64; x < 1024; x += 256) line(x, 0, x, 1024);
+  g.shadowColor = b.gridCol; g.shadowBlur = 4; g.strokeStyle = b.gridCol; g.lineWidth = 1.3;
+  for (let x = 0; x < 1024; x += 128) if (x % 256 !== 64) line(x, 0, x, 1024);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 32);
+  tex.anisotropy = MAX_ANISO;
+  return tex;
+}
+const TUBE_TEX = BIOMES.map(makeTubeTexture);
+
+// Tunnel: cheap unlit neon material + a second shell for smooth biome cross-fades
+const tunnelGeom = new THREE.CylinderGeometry(PIPE_RADIUS, PIPE_RADIUS, TOTAL_DEPTH, 40, 24, true);
+tunnelGeom.rotateX(HALF_PI);
+const tunnelA = new THREE.Mesh(tunnelGeom, new THREE.MeshBasicMaterial({ map: TUBE_TEX[0], side: THREE.DoubleSide }));
+tunnelA.position.z = -TOTAL_DEPTH / 2 + 10;
+scene.add(tunnelA);
+const tunnelB = new THREE.Mesh(tunnelGeom, new THREE.MeshBasicMaterial({
+  map: TUBE_TEX[1], side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false
+}));
+tunnelB.position.z = tunnelA.position.z;
+tunnelB.scale.set(0.996, 0.996, 1);
+tunnelB.visible = false;
+scene.add(tunnelB);
+
+// ─── Speed light streaks: ONE instanced draw call ───
+const STREAK_COUNT = 36;
+const streakMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false
+});
+const streakMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.06, 7), streakMat, STREAK_COUNT);
+streakMesh.frustumCulled = false;
+streakMesh.visible = false;
+const streakData = [];
+const _dummy = new THREE.Object3D();
+for (let i = 0; i < STREAK_COUNT; i++) {
+  streakData.push({ ang: Math.random() * TAU, rad: PIPE_RADIUS - 0.4 - Math.random() * 1.6, z: Math.random() * TOTAL_DEPTH });
+}
+scene.add(streakMesh);
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 4: PLAYER VEHICLE
+// ═══════════════════════════════════════════════════════════
+function createBatmobile() {
+  const group = new THREE.Group();
+  const armorMat = new THREE.MeshStandardMaterial({ color: 0x3a4660, roughness: 0.5, metalness: 0.45, flatShading: true, emissive: 0x0c1830, emissiveIntensity: 0.9 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.2, metalness: 0.95 });
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, roughness: 0.2, metalness: 0.3, emissive: 0x00a8c0, emissiveIntensity: 0.9 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x060606, roughness: 0.85, metalness: 0.15 });
+  const rimMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const neonAccentMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const tailpipeMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+
+  const noseGeom = new THREE.ConeGeometry(0.85, 2.6, 5);
+  noseGeom.rotateX(-HALF_PI); noseGeom.scale(1.4, 0.5, 1); noseGeom.translate(0, 0.16, -1.6);
+  group.add(new THREE.Mesh(noseGeom, armorMat));
+
+  const cabinGeom = new THREE.BoxGeometry(1.65, 0.65, 2.3); cabinGeom.translate(0, 0.32, 0.1);
+  group.add(new THREE.Mesh(cabinGeom, armorMat));
+
+  const canopyGeom = new THREE.ConeGeometry(0.7, 1.4, 4);
+  canopyGeom.rotateX(-HALF_PI); canopyGeom.scale(1.1, 0.65, 1); canopyGeom.translate(0, 0.68, -0.1);
+  group.add(new THREE.Mesh(canopyGeom, canopyMat));
+
+  [-0.95, 0.95].forEach(x => {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.5, 1.8), trimMat);
+    f.position.set(x, 0.22, -1.2); group.add(f);
+  });
+
+  [-1, 1].forEach(s => {
+    const fg = new THREE.BoxGeometry(0.12, 1.25, 1.6);
+    fg.translate(1.05 * s, 0.85, 1.0); fg.rotateZ(-0.22 * s);
+    group.add(new THREE.Mesh(fg, armorMat));
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 1.7), neonAccentMat);
+    edge.position.set(1.18 * s, 1.42, 1.0); edge.rotation.z = -0.22 * s;
+    group.add(edge);
+  });
+
+  const wheels = [];
+  function createWheel(x, y, z, width, radius) {
+    const w = new THREE.Group();
+    const tg = new THREE.CylinderGeometry(radius, radius, width, 14); tg.rotateZ(HALF_PI);
+    w.add(new THREE.Mesh(tg, tireMat));
+    const rg = new THREE.TorusGeometry(radius * 0.62, 0.05, 6, 14); rg.rotateY(HALF_PI);
+    w.add(new THREE.Mesh(rg, rimMat));
+    w.position.set(x, y, z); wheels.push(w); group.add(w);
+  }
+  createWheel(-1.15, -0.15, -1.2, 0.44, 0.54);
+  createWheel(1.15, -0.15, -1.2, 0.44, 0.54);
+  createWheel(-1.26, -0.10, 1.15, 0.62, 0.66);
+  createWheel(1.26, -0.10, 1.15, 0.62, 0.66);
+
+  const turbGeom = new THREE.CylinderGeometry(0.42, 0.48, 0.9, 14); turbGeom.rotateX(HALF_PI); turbGeom.translate(0, 0.38, 1.5);
+  group.add(new THREE.Mesh(turbGeom, trimMat));
+  const exhaustRing = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.42, 14), tailpipeMat);
+  exhaustRing.position.set(0, 0.38, 1.96); group.add(exhaustRing);
+
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  const flameGeom = new THREE.ConeGeometry(0.32, 2.2, 12); flameGeom.rotateX(HALF_PI); flameGeom.translate(0, 0, 1.1);
+  const flame = new THREE.Mesh(flameGeom, flameMat); flame.position.set(0, 0.38, 1.9); group.add(flame);
+  const coreGeom = new THREE.ConeGeometry(0.18, 1.3, 12); coreGeom.rotateX(HALF_PI); coreGeom.translate(0, 0, 0.65);
+  const coreFlame = new THREE.Mesh(coreGeom, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  coreFlame.position.set(0, 0.38, 1.95); group.add(coreFlame);
+
+  const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  [-0.55, 0.55].forEach(x => {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.12, 0.05), hlMat);
+    hl.position.set(x, 0.22, -2.7); group.add(hl);
+  });
+  // Solid neon light bar across the nose (replaces the translucent beam that made the front look see-through)
+  const beamCone = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.14), new THREE.MeshBasicMaterial({ color: 0x00f0ff }));
+  beamCone.position.set(0, 0.3, -2.62); group.add(beamCone);
+
+  const underglow = new THREE.PointLight(0x00f0ff, 4.2, 16);
+  underglow.position.set(0, -0.4, 0); group.add(underglow);
+
+  group.userData = { flame, coreFlame, underglow, beamCone, neonAccentMat, canopyMat, rimMat, flameMat, wheels };
+  return group;
+}
+const playerBatmobile = createBatmobile();
+scene.add(playerBatmobile);
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 5: SHARED OBSTACLE GEOMETRY & MATERIALS (built once)
+//
+// Angle convention: pos = (sin θ·r, −cos θ·r) → θ=0 is the pipe floor.
+// CylinderGeometry thetas map 1:1 to θ after rotateX(π/2).
+// RingGeometry thetas map as ringθ = θ − π/2.
+// ═══════════════════════════════════════════════════════════
+const R = PIPE_RADIUS;
+const _xo = new THREE.Object3D();
+function xf(geom, x, y, z, rz) {
+  _xo.position.set(x || 0, y || 0, z || 0);
+  _xo.rotation.set(0, 0, rz || 0);
+  _xo.scale.set(1, 1, 1);
+  _xo.updateMatrix();
+  const g = geom.index ? geom.toNonIndexed() : geom.clone();
+  g.applyMatrix4(_xo.matrix);
+  return g;
+}
+// Merge position-only geometries (for unlit MeshBasicMaterial) into one draw call
+function mergeGeoms(list) {
+  let n = 0;
+  for (const g of list) n += g.attributes.position.array.length;
+  const pos = new Float32Array(n);
+  let o = 0;
+  for (const g of list) { pos.set(g.attributes.position.array, o); o += g.attributes.position.array.length; g.dispose(); }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.computeBoundingSphere();
+  return out;
+}
+function arcCyl(r, h, seg, start, len) {
+  const g = new THREE.CylinderGeometry(r, r, h, seg, 1, true, start, len);
+  g.rotateX(HALF_PI);
+  return g;
+}
+
+const DS = THREE.DoubleSide;
+const MAT = {
+  red:      new THREE.MeshBasicMaterial({ color: 0xff0044 }),
+  redDS:    new THREE.MeshBasicMaterial({ color: 0xff0044, side: DS }),
+  hub:      new THREE.MeshBasicMaterial({ color: 0xff0055 }),
+  yellow:   new THREE.MeshBasicMaterial({ color: 0xffea00 }),
+  yellowDS: new THREE.MeshBasicMaterial({ color: 0xffea00, side: DS }),
+  redT:     new THREE.MeshBasicMaterial({ color: 0xff0044, transparent: true }),
+  yellowT:  new THREE.MeshBasicMaterial({ color: 0xffea00, transparent: true }),
+  glowRed:  new THREE.MeshBasicMaterial({ color: 0xff0044, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }),
+  irisPlate:new THREE.MeshBasicMaterial({ color: 0x3a0010, side: DS }),
+  coin:     new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x7a4c00 }),
+  halo:     new THREE.MeshBasicMaterial({ color: 0xffea00 }),
+  shield:   new THREE.MeshBasicMaterial({ color: 0x00ff88 }),
+  shieldRing: new THREE.MeshBasicMaterial({ color: 0x00ffaa, side: DS }),
+  cpBand:   new THREE.MeshBasicMaterial({ color: 0x00ffee, side: DS, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
+  cpEdge:   new THREE.MeshBasicMaterial({ color: 0xffffff, side: DS })
+};
+
+// Nitro pad texture (shared)
+const PAD_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, 128, 256);
+  g.strokeStyle = '#ffe600'; g.lineWidth = 22; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.shadowColor = '#ffe600'; g.shadowBlur = 18;
+  for (let y = 60; y < 256; y += 65) { g.beginPath(); g.moveTo(25, y + 25); g.lineTo(64, y - 20); g.lineTo(103, y + 25); g.stroke(); }
+  return new THREE.CanvasTexture(c);
+})();
+MAT.pad = new THREE.MeshBasicMaterial({ map: PAD_TEX, side: DS, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+
+// Soft glow sprite (replaces per-object point lights — zero lighting cost)
+const GLOW_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const SPRITE_MATS = {};
+function glowSprite(color, size) {
+  if (!SPRITE_MATS[color]) SPRITE_MATS[color] = new THREE.SpriteMaterial({ map: GLOW_TEX, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+  const s = new THREE.Sprite(SPRITE_MATS[color]);
+  s.scale.set(size, size, 1);
+  return s;
+}
+
+const GEO = {};
+// Laser gate
+GEO.gateBeam = new THREE.BoxGeometry(R * 1.86, 1.8, 0.8);
+GEO.gateGlow = new THREE.BoxGeometry(R * 1.86, 3.6, 0.15);
+{ const l = []; for (let x = -R * 0.8; x <= R * 0.8 + 1e-6; x += 2.2) l.push(xf(new THREE.BoxGeometry(0.7, 1.9, 0.85), x, 0, 0, 0)); GEO.gateChev = mergeGeoms(l); }
+
+// Propellers (2 & 3 blade), finite blades hub→wall
+const BLADE_LEN = R * 0.94;
+function buildProp(N) {
+  const red = [], yel = [];
+  const hub = new THREE.CylinderGeometry(1.6, 1.6, 1.2, 16); hub.rotateX(HALF_PI);
+  red.push(xf(hub));
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * TAU;
+    const arm = new THREE.BoxGeometry(0.7, BLADE_LEN, 0.7); arm.translate(0, BLADE_LEN / 2, 0);
+    red.push(xf(arm, 0, 0, 0, a));
+    for (let s = 2.4; s < BLADE_LEN - 1; s += 2.4) {
+      const d = new THREE.BoxGeometry(1.0, 0.9, 0.8); d.translate(0, s, 0);
+      yel.push(xf(d, 0, 0, 0, a));
+    }
+  }
+  return { red: mergeGeoms(red), yel: mergeGeoms(yel) };
+}
+GEO.prop = { 2: buildProp(2), 3: buildProp(3) };
+
+// Curved wall
+const WALL_ARC = Math.PI * (IS_TOUCH ? 0.5 : 0.65);   // touch: thinner walls leave a wider lane
+GEO.wall = arcCyl(R * 0.98, 3.2, 16, -WALL_ARC / 2, WALL_ARC);
+GEO.wallRails = mergeGeoms([
+  xf(arcCyl(R * 0.99, 0.45, 16, -WALL_ARC / 2, WALL_ARC), 0, 0, -1.4),
+  xf(arcCyl(R * 0.99, 0.45, 16, -WALL_ARC / 2, WALL_ARC), 0, 0, 1.4)
+]);
+
+// Narrow curved wall (used by the pinch pattern, leaves wider side lanes)
+const WALL_ARC_NARROW = Math.PI * (IS_TOUCH ? 0.4 : 0.5);
+GEO.wallNarrow = arcCyl(R * 0.98, 3.2, 16, -WALL_ARC_NARROW / 2, WALL_ARC_NARROW);
+GEO.wallRailsNarrow = mergeGeoms([
+  xf(arcCyl(R * 0.99, 0.45, 16, -WALL_ARC_NARROW / 2, WALL_ARC_NARROW), 0, 0, -1.4),
+  xf(arcCyl(R * 0.99, 0.45, 16, -WALL_ARC_NARROW / 2, WALL_ARC_NARROW), 0, 0, 1.4)
+]);
+
+// Iris (blocked arc centered at θ=0, window at θ=π)
+const IRIS_GAP = IS_TOUCH ? 2.0 : 1.6;   // ~115° touch / ~92° desktop window
+const IRIS_BLOCK = TAU - IRIS_GAP;
+GEO.irisWall = arcCyl(R * 0.97, 2.6, 40, -IRIS_BLOCK / 2, IRIS_BLOCK);
+GEO.irisPlate = new THREE.RingGeometry(R * 0.45, R * 0.96, 40, 1, -HALF_PI - IRIS_BLOCK / 2, IRIS_BLOCK);
+{
+  const mid = R * 0.7, l = [];
+  [-IRIS_BLOCK / 2, IRIS_BLOCK / 2].forEach(a => l.push(xf(new THREE.BoxGeometry(0.5, R * 0.55, 2.7), Math.sin(a) * mid, -Math.cos(a) * mid, 0, a)));
+  GEO.irisEdges = mergeGeoms(l);
+}
+
+// Funnel — gap centered at θ=0, three tightness levels
+const FUNNEL_GAPS = IS_TOUCH ? [2.5, 2.3, 2.1] : [2.1, 1.9, 1.7];   // open entry widths (were 1.5 / 1.3 / 1.1)
+GEO.funnel = FUNNEL_GAPS.map(gap => {
+  const half = (TAU - gap) / 2, red = [], yel = [];
+  [-1, 1].forEach((side, idx) => {
+    const c = Math.PI + side * (half / 2);
+    red.push(xf(arcCyl(R * 0.98, 3.0, 20, c - half / 2, half), 0, 0, idx ? 1 : -1));
+    yel.push(xf(arcCyl(R * 0.99, 0.4, 20, c - half / 2, half), 0, 0, idx ? 2.4 : -2.4));
+  });
+  return { red: mergeGeoms(red), yel: mergeGeoms(yel) };
+});
+
+// Spike block (built on the floor, θ=0)
+const SPIKE_RAD = R - 1.5;
+GEO.spikeBase = mergeGeoms([xf(new THREE.BoxGeometry(4.2, 1.6, 2.0), 0, -SPIKE_RAD, 0)]);
+{
+  const l = [];
+  for (let x = -1.2; x <= 1.2 + 1e-6; x += 1.2) { const c = new THREE.ConeGeometry(0.5, 1.6, 8); c.rotateX(HALF_PI); l.push(xf(c, x, -SPIKE_RAD, -1.2)); }
+  GEO.spikeCones = mergeGeoms(l);
+}
+
+// Pickups
+GEO.coin = new THREE.CylinderGeometry(1.6, 1.6, 0.35, 20); GEO.coin.rotateX(HALF_PI);
+GEO.halo = new THREE.TorusGeometry(1.9, 0.08, 6, 24);
+GEO.shield = new THREE.OctahedronGeometry(1.5, 0);
+GEO.shieldRing = new THREE.RingGeometry(1.8, 2.1, 16);
+GEO.pad = new THREE.PlaneGeometry(4.2, 9.0); GEO.pad.rotateX(-HALF_PI);
+
+// Checkpoint: glowing band hugging the wall (no floating rings)
+GEO.cpBand = arcCyl(R * 0.985, 1.4, 48, 0, TAU);
+GEO.cpEdges = mergeGeoms([xf(arcCyl(R * 0.99, 0.18, 48, 0, TAU), 0, 0, -1.1), xf(arcCyl(R * 0.99, 0.18, 48, 0, TAU), 0, 0, 1.1)]);
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 6: OBSTACLE FACTORIES (cheap: shared GPU resources)
+// ═══════════════════════════════════════════════════════════
+const obstacles = [];
+const mesh = (g, m) => new THREE.Mesh(g, m);
+
+// Laser gate — beam along local X → blocks θ = angle ± π/2
+function createLaserGate(angle) {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.gateBeam, MAT.red), mesh(GEO.gateChev, MAT.yellow), mesh(GEO.gateGlow, MAT.glowRed));
+  g.rotation.z = angle;
+  g.userData = { kind: 'hazard', type: 'laserGate', angle, beamHalfAngle: Math.asin(0.9 / CAR_RADIUS), radialMin: 0, radialMax: R };
+  return g;
+}
+
+// Pulsing gate — own (cloned) materials so it can fade on/off
+function createPulseGate(angle, phase, period) {
+  const g = new THREE.Group();
+  const beamMat = MAT.redT.clone(), chevMat = MAT.yellowT.clone(), glowMat = MAT.glowRed.clone();
+  g.add(mesh(GEO.gateBeam, beamMat), mesh(GEO.gateChev, chevMat), mesh(GEO.gateGlow, glowMat));
+  g.rotation.z = angle;
+  g.userData = {
+    kind: 'hazard', type: 'pulseGate', angle, beamHalfAngle: Math.asin(0.9 / CAR_RADIUS),
+    radialMin: 0, radialMax: R, phase, period: period || 1.7, onFraction: 0.55,
+    beamMat, chevMat, glowMat, ownMats: [beamMat, chevMat, glowMat], lastOn: null
+  };
+  return g;
+}
+function pulseGateActiveAt(ud, t) {
+  const cyc = ((t + ud.phase) % ud.period + ud.period) % ud.period;
+  return cyc < ud.period * ud.onFraction;
+}
+
+// Rotor — blade k at θ = rotation.z + k·2π/N + π
+function createPropeller(armCount, spinSpeed) {
+  const g = new THREE.Group();
+  const p = GEO.prop[armCount];
+  g.add(mesh(p.red, MAT.hub), mesh(p.yel, MAT.yellow));
+  g.rotation.z = Math.random() * TAU;
+  g.userData = { kind: 'hazard', type: 'propeller', armCount, spinSpeed, bladeHalfAngle: 0.35 / CAR_RADIUS, radialMin: 1.6, radialMax: BLADE_LEN };
+  return g;
+}
+
+function createCurvedWall(angle, narrow) {
+  const g = new THREE.Group();
+  const geo = narrow ? GEO.wallNarrow : GEO.wall;
+  const rails = narrow ? GEO.wallRailsNarrow : GEO.wallRails;
+  g.add(mesh(geo, MAT.redDS), mesh(rails, MAT.yellowDS));
+  g.rotation.z = angle;
+  g.userData = { kind: 'hazard', type: 'curvedWall', angle, arc: narrow ? WALL_ARC_NARROW : WALL_ARC, radialMin: R - 2.4, radialMax: R };
+  return g;
+}
+
+// Swinging door — a curved wall that swings back and forth across the pipe
+function createSwing(base, amp, omega) {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.wall, MAT.redDS), mesh(GEO.wallRails, MAT.yellowDS));
+  g.rotation.z = base;
+  g.userData = {
+    kind: 'hazard', type: 'swing', base, amp, omega, phase: Math.random() * TAU,
+    arc: WALL_ARC, radialMin: R - 2.4, radialMax: R, nearMiss: 0.25
+  };
+  return g;
+}
+function swingAngleAt(ud, t) { return ud.base + ud.amp * Math.sin(ud.omega * t + ud.phase); }
+
+function createIris(spinSpeed) {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.irisWall, MAT.redDS), mesh(GEO.irisPlate, MAT.irisPlate), mesh(GEO.irisEdges, MAT.yellow));
+  g.rotation.z = Math.random() * TAU;
+  g.userData = { kind: 'hazard', type: 'iris', spinSpeed, blockArc: IRIS_BLOCK, radialMin: R * 0.45, radialMax: R, nearMiss: 0.22 };
+  return g;
+}
+
+function createFunnel(gapCenter, level) {
+  const g = new THREE.Group();
+  const f = GEO.funnel[level];
+  g.add(mesh(f.red, MAT.redDS), mesh(f.yel, MAT.yellowDS));
+  g.rotation.z = gapCenter;
+  g.userData = { kind: 'hazard', type: 'funnel', gapCenter, gapSize: FUNNEL_GAPS[level], radialMin: R - 2.4, radialMax: R, nearMiss: 0.3 };
+  return g;
+}
+
+function createSpikeBlock(angle) {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.spikeBase, MAT.red), mesh(GEO.spikeCones, MAT.yellow));
+  g.rotation.z = angle;
+  g.userData = { kind: 'hazard', type: 'spikeBlock', angle, halfAngle: 2.1 / CAR_RADIUS, radialMin: R - 3.0, radialMax: R };
+  return g;
+}
+
+// Radar sweeper — a full-diameter laser that spins around the pipe centre
+function createSweeper(spinSpeed) {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.gateBeam, MAT.red), mesh(GEO.gateChev, MAT.yellow), mesh(GEO.gateGlow, MAT.glowRed));
+  g.rotation.z = Math.random() * TAU;
+  g.userData = {
+    kind: 'hazard', type: 'sweeper', spinSpeed,
+    beamHalfAngle: Math.asin(0.9 / CAR_RADIUS), radialMin: 0, radialMax: R, nearMiss: 0.2
+  };
+  return g;
+}
+
+function createGoldCoin(angle) {
+  const g = new THREE.Group();
+  const coin = mesh(GEO.coin, MAT.coin);
+  g.add(coin, mesh(GEO.halo, MAT.halo), glowSprite(0xffaa00, 7));
+  const rad = R - 1.8;
+  g.position.set(Math.sin(angle) * rad, -Math.cos(angle) * rad, 0);
+  g.userData = { kind: 'pickup', type: 'coin', angle, coin };
+  return g;
+}
+
+function createShieldCell(angle) {
+  const g = new THREE.Group();
+  const prism = mesh(GEO.shield, MAT.shield);
+  g.add(prism, mesh(GEO.shieldRing, MAT.shieldRing), glowSprite(0x00ff99, 7));
+  const rad = R - 1.8;
+  g.position.set(Math.sin(angle) * rad, -Math.cos(angle) * rad, 0);
+  g.userData = { kind: 'pickup', type: 'shield', angle, prism };
+  return g;
+}
+
+function createNitroPad(angle) {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.pad, MAT.pad));
+  const rad = R - 0.15;
+  g.position.set(Math.sin(angle) * rad, -Math.cos(angle) * rad, 0);
+  g.rotation.z = angle + Math.PI;
+  g.userData = { kind: 'pickup', type: 'boost', angle };
+  return g;
+}
+
+function createCheckpoint() {
+  const g = new THREE.Group();
+  g.add(mesh(GEO.cpBand, MAT.cpBand), mesh(GEO.cpEdges, MAT.cpEdge));
+  g.userData = { kind: 'checkpoint', type: 'checkpoint' };
+  return g;
+}
+
+function registerObstacle(obs, z) {
+  const ud = obs.userData;
+  ud.z = z; ud.prevZ = z;
+  ud.collected = false; ud.resolved = false; ud.minClear = Infinity;
+  obs.position.z = -z;
+  scene.add(obs);
+  obstacles.push(obs);
+}
+function removeObstacle(i) {
+  const obs = obstacles[i];
+  scene.remove(obs);
+  if (obs.userData.ownMats) for (const m of obs.userData.ownMats) m.dispose();
+  obstacles.splice(i, 1);
+}
+function clearObstacles() {
+  for (let i = obstacles.length - 1; i >= 0; i--) removeObstacle(i);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 7: PROCEDURAL PATTERNS
+// ═══════════════════════════════════════════════════════════
+let spawnCursor = 0;
+
+function difficulty() { return clamp01(Game.distance / 2600); }
+// Spacing is set in travel time, not metres, so the reaction window stays the
+// same at any speed. Touch gets a longer window (about 1 s at base speed).
+function spacing() {
+  const v = Math.max(Game.speed, TIERS[Game.tier].base) / 3.6;
+  const timed = v * (IS_TOUCH ? 1.0 : 0.6);
+  return Math.min(130, Math.max(46 - 18 * difficulty(), timed));
+}
+function propSpin() { return (Math.random() < 0.5 ? 1 : -1) * (1.1 + Math.random() * 0.8 + 1.1 * difficulty()); }
+
+function spawnSingleAt(z) {
+  const r = Math.random();
+  let obs;
+  if (r < 0.13)       obs = createGoldCoin(Math.random() * TAU);
+  else if (r < 0.22)  obs = createShieldCell(Math.random() * TAU);
+  else if (r < 0.31)  obs = createNitroPad(Math.random() * TAU);
+  else if (r < 0.50)  obs = createLaserGate(Math.random() * Math.PI);
+  else if (r < 0.70)  obs = createPropeller(Math.random() < 0.5 ? 2 : 3, propSpin());
+  else if (r < 0.86)  obs = createCurvedWall(Math.random() * TAU);
+  else                obs = createSpikeBlock(Math.random() * TAU);
+  registerObstacle(obs, z);
+  if (obs.userData.type === 'curvedWall' && Math.random() < 0.3) {
+    registerObstacle(createGoldCoin(obs.userData.angle + Math.PI), z + 7);
+  }
+}
+
+const PATTERNS = {
+  mixed(z0) {
+    const n = 3 + Math.floor(Math.random() * 3);
+    let z = z0;
+    for (let i = 0; i < n; i++) { spawnSingleAt(z); z += spacing() * (0.85 + Math.random() * 0.4); }
+    return z;
+  },
+  slalom(z0) {
+    const n = 4 + Math.floor(Math.random() * 3), base = Math.random() * TAU;
+    let z = z0;
+    for (let i = 0; i < n; i++) { registerObstacle(createCurvedWall(base + (i % 2) * Math.PI), z); z += spacing() * 0.82; }
+    registerObstacle(createGoldCoin(base + (n % 2) * Math.PI + Math.PI), z);
+    return z + 10;
+  },
+  corkscrew(z0) {
+    const base = Math.random() * TAU;
+    const step = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 3 + Math.random() * 0.3);
+    let z = z0;
+    for (let i = 0; i < 5; i++) { registerObstacle(createLaserGate(base + i * step), z); z += spacing() * 0.78; }
+    registerObstacle(createNitroPad(base + 5 * step + HALF_PI), z);
+    return z + 10;
+  },
+  iris(z0) {
+    const spin = (Math.random() < 0.5 ? 1 : -1) * (0.5 + 0.5 * difficulty() + Math.random() * 0.3);
+    registerObstacle(createIris(spin), z0);
+    registerObstacle(createGoldCoin(Math.random() * TAU), z0 + 16);
+    return z0 + 24;
+  },
+  funnel(z0) {
+    const d = difficulty();
+    const level = d < 0.35 ? 0 : (d < 0.7 ? 1 : 2);
+    const gc = Math.random() < 0.5 ? 0 : Math.PI;
+    registerObstacle(createFunnel(gc, level), z0);
+    registerObstacle(createGoldCoin(gc), z0 + 8);
+    let z = z0 + spacing();
+    if (Math.random() < 0.5) {
+      registerObstacle(createFunnel(gc + Math.PI, level), z);
+      registerObstacle(createShieldCell(gc + Math.PI), z + 8);
+      z += spacing() * 0.7;
+    }
+    return z + 8;
+  },
+  pulse(z0) {
+    const period = 1.9 - 0.4 * difficulty();
+    let z = z0;
+    for (let i = 0; i < 3; i++) { registerObstacle(createPulseGate(Math.random() * Math.PI, i * period * 0.45, period), z); z += spacing() * 0.8; }
+    return z + 6;
+  },
+  // Twin sweep: two radar beams counter-rotating at different speeds
+  twinSweep(z0) {
+    const s = 1.1 + 0.8 * difficulty();
+    const g2 = Math.max(16, spacing() * 0.35);
+    registerObstacle(createSweeper(s), z0);
+    registerObstacle(createSweeper(-s * 1.4), z0 + g2);
+    registerObstacle(createGoldCoin(Math.random() * TAU), z0 + 22);
+    return z0 + g2 + 10;
+  },
+  // Swinging doors: two opposing doors swing in and out of the lane
+  swingDoor(z0) {
+    const base = Math.random() * TAU, amp = 1.0 + 0.4 * difficulty(), omega = 1.2 + 1.0 * difficulty();
+    registerObstacle(createSwing(base, amp, omega), z0);
+    const g2 = Math.max(16, spacing() * 0.3);
+    registerObstacle(createSwing(base + Math.PI, amp, omega * 0.8), z0 + g2);
+    registerObstacle(createGoldCoin(base + HALF_PI), z0 + 5);
+    return z0 + g2 + 12;
+  },
+  // Minefield: clusters of spikes scattered at random angles
+  minefield(z0) {
+    let z = z0;
+    for (let i = 0; i < 3; i++) {
+      for (let k = 0; k < 3; k++) registerObstacle(createSpikeBlock(Math.random() * TAU), z + k * 4);
+      z += Math.max(14, spacing() * 0.4);
+    }
+    return z + 8;
+  },
+  // Coin spiral: a reward trail that winds around the pipe, ending in a shield cell
+  coinSpiral(z0) {
+    const base = Math.random() * TAU, dir = Math.random() < 0.5 ? 1 : -1;
+    let z = z0;
+    for (let i = 0; i < 10; i++) { registerObstacle(createGoldCoin(base + dir * i * 0.45), z); z += 3.2; }
+    registerObstacle(createShieldCell(base + dir * 10 * 0.45), z + 2);
+    return z + 10;
+  },
+  // Spike walk: spikes march around the pipe with a coin in each gap
+  spikeGauntlet(z0) {
+    const base = Math.random() * TAU, n = 5 + Math.floor(Math.random() * 3);
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    let z = z0;
+    for (let i = 0; i < n; i++) {
+      const a = base + dir * i * 1.25;
+      registerObstacle(createSpikeBlock(a), z);
+      if (i < n - 1) registerObstacle(createGoldCoin(a + dir * 0.625), z + 5);
+      z += spacing() * 0.7;
+    }
+    return z + 8;
+  },
+  // Radar sweep: a spinning full-width laser with a coin on the far side
+  sweep(z0) {
+    const spin = (Math.random() < 0.5 ? 1 : -1) * (1.3 + 0.9 * difficulty() + Math.random() * 0.4);
+    registerObstacle(createSweeper(spin), z0);
+    registerObstacle(createGoldCoin(Math.random() * TAU), z0 + 14);
+    return z0 + 26;
+  },
+  // Crossfire: two perpendicular gates in quick succession, shield on the safe side
+  crossfire(z0) {
+    const a = Math.random() * Math.PI, gap = spacing() * 0.75;
+    registerObstacle(createLaserGate(a), z0);
+    registerObstacle(createLaserGate(a + HALF_PI), z0 + gap);
+    registerObstacle(createShieldCell(a + Math.PI), z0 + gap + 6);
+    return z0 + gap + 16;
+  },
+  // Pinch: two opposing curved walls leave two side lanes, coins in each
+  pinch(z0) {
+    const a = Math.random() * TAU;
+    registerObstacle(createCurvedWall(a, true), z0);
+    registerObstacle(createCurvedWall(a + Math.PI, true), z0);
+    registerObstacle(createGoldCoin(a + HALF_PI), z0 + 9);
+    registerObstacle(createGoldCoin(a - HALF_PI), z0 + 9);
+    return z0 + 18;
+  },
+  rewardRun(z0) {
+    const ang = Math.random() * TAU, safe = ang + Math.PI;
+    registerObstacle(createCurvedWall(ang), z0);
+    let z = z0 + 8;
+    for (let i = 0; i < 3; i++) { registerObstacle(createGoldCoin(safe + (Math.random() - 0.5) * 0.4), z); z += 9; }
+    registerObstacle(createNitroPad(safe), z);
+    registerObstacle(createPropeller(2, propSpin()), z + spacing() * 0.7);
+    return z + spacing() * 0.7 + 6;
+  }
+};
+
+function pickPattern() {
+  const d = Game.distance, pool = ['mixed', 'mixed'];
+  if (d >= 150) pool.push('slalom');
+  if (d >= 200) pool.push('rewardRun');
+  if (d >= 250) pool.push('pulse');
+  if (d >= 400) pool.push('corkscrew');
+  if (d >= 500) pool.push('funnel');
+  if (d >= 600) pool.push('iris');
+  if (d >= 40)  pool.push('spikeGauntlet');
+  if (d >= 120) pool.push('sweep');
+  if (d >= 180) pool.push('crossfire');
+  if (d >= 260) pool.push('pinch');
+  if (d >= 60)  pool.push('minefield');
+  if (d >= 90)  pool.push('coinSpiral');
+  if (d >= 200) pool.push('swingDoor');
+  if (d >= 320) pool.push('twinSweep');
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function fillTunnel() {
+  let guard = 0;
+  while (spawnCursor < TOTAL_DEPTH - 10 && guard++ < 24) {
+    const start = Math.max(spawnCursor, 55);
+    spawnCursor = PATTERNS[coachPattern()](start) + 14 + Math.random() * 16;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 8: GAME STATE, MODES & TIERS
+// ═══════════════════════════════════════════════════════════
+const TIERS = {
+  normal: { base: 280, max: 520, boost: 780, ramp: 0.025, steer: 6.8 },
+  fast:   { base: 340, max: 600, boost: 880, ramp: 0.032, steer: 7.3 },
+  hyper:  { base: 400, max: 690, boost: 980, ramp: 0.040, steer: 7.9 }
+};
+
+const Game = {
+  active: false, paused: false, mode: 'endless', tier: 'normal',
+  angle: 0, speed: 280, distance: 0, score: 0, shield: 100,
+  elapsedTime: 0, boostTimer: 0, screenShake: 0, invulnerableTimer: 0, lastDamageTime: -99,
+  alarmTimer: 0, hbTimer: 0, fovPunch: 0,
+  countdown: 0, cdShown: -1,
+  combo: 0, comboTimer: 0, shaves: 0,
+  timeLeft: 90, nextCheckpoint: 300, lastTickSec: -1,
+  hudAcc: 0, bestScore: 0, runToken: 0, prevAngle: 0, coins: 0
+};
+
+function bestKey(mode) { return 'piperiders_best_' + mode; }
+function readBest(mode) { try { return parseInt(localStorage.getItem(bestKey(mode)), 10) || 0; } catch (e) { return 0; } }
+function writeBest(mode, v) { try { localStorage.setItem(bestKey(mode), String(v)); } catch (e) {} }
+function updateMenuBest() {
+  const e = readBest('endless'), s = readBest('sprint');
+  document.getElementById('menu-best').textContent =
+    (e || s) ? `BEST ENDLESS ${e.toLocaleString()}  •  BEST SPRINT ${s.toLocaleString()}` : '';
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 9: INPUT (keyboard + multi-touch)
+// ═══════════════════════════════════════════════════════════
+const keys = {};
+const touch = { steer: 0, throttle: 0 };   // analog stick output, both -1..1
+
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) setPaused(!Game.paused);
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+function releaseAllInput() { for (const k in keys) keys[k] = false; stickUp(); }
+window.addEventListener('blur', () => { releaseAllInput(); setPaused(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAllInput(); setPaused(true); } });
+
+// ── Floating analog stick ──
+// Touch anywhere and drag. Horizontal drag = steer, vertical drag = throttle/brake.
+// Deflection is proportional to how far the finger moves from where it landed.
+const STICK_MAX = 70, STICK_DEAD = 8;
+const stickBase = document.getElementById('stick-base');
+const stickKnob = document.getElementById('stick-knob');
+const stick = { id: -1, ox: 0, oy: 0 };
+function axis(d) {
+  const m = Math.abs(d);
+  if (m < STICK_DEAD) return 0;
+  const v = Math.min(1, (m - STICK_DEAD) / (STICK_MAX - STICK_DEAD));
+  return Math.sign(d) * Math.pow(v, 1.35);   // gentle curve: fine control near centre
+}
+function stickDown(t) {
+  stick.id = t.identifier; stick.ox = t.clientX; stick.oy = t.clientY;
+  const pos = `translate(${stick.ox}px, ${stick.oy}px)`;
+  stickBase.style.transform = pos; stickKnob.style.transform = pos;
+  stickBase.classList.add('on'); stickKnob.classList.add('on');
+}
+function stickMove(t) {
+  const dx = t.clientX - stick.ox, dy = t.clientY - stick.oy;
+  const len = Math.hypot(dx, dy), k = len > STICK_MAX ? STICK_MAX / len : 1;
+  stickKnob.style.transform = `translate(${stick.ox + dx * k}px, ${stick.oy + dy * k}px)`;
+  touch.steer = axis(dx);
+  touch.throttle = -axis(dy);   // drag up = accelerate
+}
+function stickUp() {
+  stick.id = -1; touch.steer = 0; touch.throttle = 0;
+  if (stickBase) { stickBase.classList.remove('on'); stickKnob.classList.remove('on'); }
+}
+
+// Touch gestures (full screen, no buttons):
+//  • one finger down/drag → analog stick
+//  • quick double-tap     → nitro
+//  • two-finger tap       → pause
+let lastTapAt = 0, twoFingerAt = 0;
+const zonesEl = document.getElementById('touch-zones');
+zonesEl.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length >= 2) { twoFingerAt = performance.now(); return; }
+  const t = e.changedTouches[0];
+  if (stick.id < 0) stickDown(t);
+  const now = performance.now();
+  if (now - lastTapAt < 230) { tryNitro(); lastTapAt = 0; } else lastTapAt = now;
+}, { passive: false });
+zonesEl.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) if (t.identifier === stick.id) { stickMove(t); break; }
+}, { passive: false });
+const endTouch = e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) if (t.identifier === stick.id) { stickUp(); break; }
+  if (e.touches.length === 0) {
+    if (twoFingerAt && performance.now() - twoFingerAt < 300) setPaused(true);
+    twoFingerAt = 0;
+  }
+};
+zonesEl.addEventListener('touchend', endTouch, { passive: false });
+zonesEl.addEventListener('touchcancel', endTouch, { passive: false });
+
+function tryNitro() {
+  if (!Game.active || Game.paused || Game.countdown > 0) return;
+  if (Game.boostTimer > 0 || Game.shield < 15) return;
+  Game.boostTimer = 3.5;
+  Game.shield -= 10;
+  audio.playBoost();
+  haptic(25);
+  showActionAlert('⚡ NITRO BOOST ⚡', '#ffe600');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 10: COLLISION ENGINE (continuous / swept)
+//
+// Each frame an obstacle moves prevZ → z. A crossing is registered when
+// [z, prevZ] overlaps the car band [CAR_Z_FAR, CAR_Z_NEAR], so nothing can
+// tunnel through at any speed. Rotating hazards are rewound to the exact
+// crossing instant tf. Angles compared with atan2-wrapped Δθ against each
+// hazard's true arc + the car's half-width. Radial bands must overlap.
+// ═══════════════════════════════════════════════════════════
+function arcClear(theta, center, half) {
+  return Math.abs(wrapPI(theta - center)) - (half + CAR_HALF_ANGLE);
+}
+
+// Signed clearance (rad) to the nearest blocked arc at crossing time. ≤0 = contact.
+function hazardClearance(obs, tf, dt) {
+  const ud = obs.userData, th = Game.angle;
+  switch (ud.type) {
+    case 'laserGate':
+    case 'pulseGate':
+    case 'sweeper': {
+      const rot = obs.rotation.z - (ud.spinSpeed || 0) * dt * (1 - tf);
+      return Math.min(arcClear(th, rot + HALF_PI, ud.beamHalfAngle), arcClear(th, rot - HALF_PI, ud.beamHalfAngle));
+    }
+    case 'propeller': {
+      const rot = obs.rotation.z - ud.spinSpeed * dt * (1 - tf);
+      let m = Infinity;
+      for (let k = 0; k < ud.armCount; k++) {
+        const c = arcClear(th, rot + (k / ud.armCount) * TAU + Math.PI, ud.bladeHalfAngle);
+        if (c < m) m = c;
+      }
+      return m;
+    }
+    case 'swing': return arcClear(th, swingAngleAt(ud, Game.elapsedTime - dt * (1 - tf)), ud.arc / 2 - 0.04);
+    case 'curvedWall': return arcClear(th, ud.angle, ud.arc / 2 - 0.04);
+    case 'iris':       return arcClear(th, obs.rotation.z - ud.spinSpeed * dt * (1 - tf), ud.blockArc / 2 - 0.03);
+    case 'funnel':     return arcClear(th, ud.gapCenter + Math.PI, (TAU - ud.gapSize) / 2 - 0.03);
+    case 'spikeBlock': return arcClear(th, ud.angle, ud.halfAngle);
+  }
+  return Infinity;
+}
+
+function radialOverlap(ud) { return ud.radialMax >= CAR_RADIAL_MIN && ud.radialMin <= CAR_RADIAL_MAX; }
+
+// Swept pickup test: did the car's angle sweep across the target during this frame,
+// or end within reach of it? Stops fast swipes from jumping over coins.
+function sweptAngleHit(a0, a1, target, reach) {
+  const d = wrapPI(a1 - a0);
+  const off = wrapPI(target - a0);
+  const inSweep = d >= 0 ? (off >= 0 && off <= d) : (off <= 0 && off >= d);
+  return inSweep || Math.abs(wrapPI(a1 - target)) < reach || Math.abs(wrapPI(a0 - target)) < reach;
+}
+
+function processObstacleCollision(obs, dt) {
+  const ud = obs.userData;
+  if (ud.resolved) return;
+
+  const pad = ud.kind === 'pickup' ? 1.0 : 0;   // pickups get a slightly wider catch band
+  if (!ud.collected && ud.z <= CAR_Z_NEAR + pad && ud.prevZ >= CAR_Z_FAR - pad) {
+    const span = ud.prevZ - ud.z;
+    const tf = span > 1e-6 ? clamp01((ud.prevZ - CAR_Z) / span) : 1;
+
+    if (ud.kind === 'pickup') {
+      const reach = (ud.type === 'boost' ? 3.4 : 3.0) / CAR_RADIUS;
+      if (sweptAngleHit(Game.prevAngle, Game.angle, ud.angle, reach)) {
+        ud.collected = true;
+        if (ud.type === 'coin') {
+          obs.visible = false;
+          Game.score += 500;
+          Game.coins++;
+          audio.playCoin();
+          // Coin milestone: every 10 coins restores shield
+          if (Game.coins % 10 === 0) {
+            Game.shield = Math.min(100, Game.shield + 12);
+            audio.playShield();
+            flashClass('shield-flash', 'flash', 120);
+            haptic([20, 30, 20]);
+            showActionAlert('💎 10 CREDITS = +12 SHIELD 💎', '#00ffaa');
+          } else {
+            showActionAlert('💎 +500 CREDITS 💎', '#ffe600');
+          }
+        } else if (ud.type === 'shield') {
+          obs.visible = false;
+          Game.shield = Math.min(100, Game.shield + 30);
+          Game.score += 800;
+          audio.playShield();
+          showActionAlert('🛡️ +30 SHIELD 🛡️', '#00ffaa');
+          flashClass('shield-flash', 'flash', 120);
+          updateHUD(true);
+        } else if (ud.type === 'boost') {
+          Game.boostTimer = 3.5;
+          Game.score += 600;
+          audio.playBoost();
+          haptic(20);
+          showActionAlert('⚡ NITRO BOOST ⚡', '#ffe600');
+        }
+      }
+    } else if (ud.kind === 'checkpoint') {
+      ud.collected = true;
+      Game.timeLeft += 20;
+      Game.score += 1000;
+      Game.boostTimer = Math.max(Game.boostTimer, 1.3);
+      audio.playCheckpoint();
+      haptic([30, 40, 30]);
+      showActionAlert('⏱ CHECKPOINT +20s ⏱', '#00ffee');
+    } else if (ud.kind === 'hazard') {
+      const live = ud.type !== 'pulseGate' || pulseGateActiveAt(ud, Game.elapsedTime - dt * (1 - tf));
+      if (live && radialOverlap(ud)) {
+        const clear = hazardClearance(obs, tf, dt);
+        if (clear < ud.minClear) ud.minClear = clear;
+        if (clear <= 0 && Game.invulnerableTimer <= 0) {
+          ud.collected = true;
+          handleImpact(25);
+        }
+      }
+    }
+  }
+
+  if (ud.z < CAR_Z_FAR) {
+    ud.resolved = true;
+    const thresh = ud.nearMiss || NEAR_MISS_RAD;
+    if (ud.kind === 'hazard' && !ud.collected && ud.minClear > 0 && ud.minClear < thresh) triggerNearMiss();
+  }
+}
+
+function triggerNearMiss() {
+  Game.combo = Math.min(Game.combo + 1, 8);
+  Game.comboTimer = 3.0;
+  Game.shaves++;
+  const bonus = 500 * Game.combo;
+  Game.score += bonus;
+  Game.fovPunch = 7;
+  audio.playWhoosh();
+  haptic(15);
+  showActionAlert(Game.combo > 1 ? `🔥 CLOSE SHAVE x${Game.combo}! +${bonus}` : '🔥 CLOSE SHAVE! +500', '#ff9500');
+  flashClass('shave-flash', 'on', 90);
+
+  const burst = document.getElementById('spark-burst');
+  burst.classList.remove('burst');
+  for (const s of burst.children) {
+    const a = Math.random() * TAU, d = 60 + Math.random() * 130;
+    s.style.setProperty('--dx', Math.cos(a) * d + 'px');
+    s.style.setProperty('--dy', Math.sin(a) * d + 'px');
+  }
+  void burst.offsetWidth;
+  burst.classList.add('burst');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 11: BIOME CROSS-FADE
+// ═══════════════════════════════════════════════════════════
+const Trans = { active: false, t: 0, from: 0, to: 0 };
+const curPrimary = new THREE.Color(BIOMES[0].primary);
+const _cA = new THREE.Color(), _cB = new THREE.Color();
+const NITRO_COLOR = new THREE.Color(0xff7700);
+
+function applyBiomeColors(fromIdx, toIdx, t) {
+  const A = BIOMES[fromIdx], B = BIOMES[toIdx];
+  _cA.setHex(A.fog).lerp(_cB.setHex(B.fog), t);
+  scene.fog.color.copy(_cA);
+  renderer.setClearColor(_cA);
+  curPrimary.setHex(A.primary).lerp(_cB.setHex(B.primary), t);
+  hemiLight.color.copy(curPrimary);
+  const ud = playerBatmobile.userData;
+  ud.underglow.color.copy(curPrimary);
+  ud.neonAccentMat.color.copy(curPrimary);
+  ud.canopyMat.color.copy(curPrimary);
+  ud.rimMat.color.copy(curPrimary);
+  ud.beamCone.material.color.copy(curPrimary);
+}
+
+function setBiomeInstant(idx) {
+  Trans.active = false;
+  tunnelA.material.map = TUBE_TEX[idx];
+  tunnelB.visible = false;
+  applyBiomeColors(idx, idx, 1);
+  setBiomeLabels(idx, false);
+}
+
+function startBiomeTransition(idx) {
+  Trans.active = true; Trans.t = 0; Trans.from = currentBiomeIdx; Trans.to = idx;
+  tunnelB.material.map = TUBE_TEX[idx];
+  tunnelB.material.opacity = 0;
+  tunnelB.visible = true;
+  setBiomeLabels(idx, true);
+}
+
+function stepBiomeTransition(dt) {
+  Trans.t = Math.min(1, Trans.t + dt / 1.3);
+  const e = Trans.t * Trans.t * (3 - 2 * Trans.t);
+  tunnelB.material.opacity = e;
+  applyBiomeColors(Trans.from, Trans.to, e);
+  if (Trans.t >= 1) {
+    tunnelA.material.map = TUBE_TEX[Trans.to];
+    tunnelB.visible = false;
+    Trans.active = false;
+  }
+}
+
+function setBiomeLabels(idx, announce) {
+  const b = BIOMES[idx], col = hexStr(b.primary);
+  document.documentElement.style.setProperty('--accent', col);
+  const tag = document.getElementById('biome-tag');
+  tag.textContent = b.name;
+  if (announce) {
+    const ann = document.getElementById('zone-announcement');
+    ann.textContent = b.name;
+    ann.classList.add('show');
+    clearTimeout(setBiomeLabels._t);
+    setBiomeLabels._t = setTimeout(() => ann.classList.remove('show'), 1600);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 12: GAME LOOP
+// ═══════════════════════════════════════════════════════════
+let camAngle = 0;
+let beaconShown = false;
+
+function update(dt) {
+  // Menu attract: slow drift down the tube
+  if (!Game.active) {
+    for (const t of TUBE_TEX) t.offset.y = (t.offset.y + dt * 0.25) % 1;
+    return;
+  }
+  if (Game.paused) return;
+
+  const tier = TIERS[Game.tier];
+  if (Trans.active) stepBiomeTransition(dt);
+
+  if (Game.countdown > 0) {
+    stepCountdown(dt);
+    audio.setThrottle(0.15, false, false);
+    updateVehicleAndCamera(dt, 0, false, tier.max, 0);
+    return;
+  }
+
+  // Biome progression
+  const targetBiome = Math.floor(Game.distance / ZONE_DISTANCE_STEP) % BIOMES.length;
+  if (currentBiomeIdx !== targetBiome) {
+    startBiomeTransition(targetBiome);
+    currentBiomeIdx = targetBiome;
+  }
+
+  // Steering
+  const left = keys['ArrowLeft'] || keys['KeyA'];
+  const right = keys['ArrowRight'] || keys['KeyD'];
+  let steer = 0;
+  if (left) steer -= 1;
+  if (right) steer += 1;
+  if (!left && !right) steer = touch.steer;   // analog stick, -1..1
+  Game.prevAngle = Game.angle;
+  Game.angle = (((Game.angle + steer * tier.steer * dt) % TAU) + TAU) % TAU;
+
+  const isAccel = keys['ArrowUp'] || keys['KeyW'] || touch.throttle > 0.35;
+  const isBraking = keys['ArrowDown'] || keys['KeyS'] || touch.throttle < -0.35;
+  if (keys['Space']) tryNitro();
+  updateCoach(dt, steer, isAccel || isBraking);
+
+  const rampBonus = Game.mode === 'endless' ? Math.min(160, Math.floor(Game.distance / 250) * 16) : 0;
+  const effMax = tier.max + rampBonus;
+
+  if (Game.boostTimer > 0) {
+    Game.boostTimer -= dt;
+    Game.speed = lerp(Game.speed, tier.boost, Math.min(1, dt * 9));
+  } else if (isAccel) {
+    Game.speed = Math.min(effMax, Game.speed + 230 * dt);
+  } else if (isBraking) {
+    Game.speed = Math.max(170, Game.speed - 290 * dt);
+  } else {
+    const cruise = Math.min(effMax, tier.base + Game.distance * tier.ramp + rampBonus * 0.5);
+    // Recover quickly from hits so the run never feels sluggish
+    const rate = Game.speed < cruise ? 4.5 : 2.5;
+    Game.speed = lerp(Game.speed, cruise, Math.min(1, dt * rate));
+  }
+
+  const speedMPS = Game.speed / 3.6;
+  const deltaDist = speedMPS * dt;
+  Game.distance += deltaDist;
+  Game.score += Math.floor(deltaDist * 4 * (1 + Game.combo * 0.25));
+  Game.elapsedTime += dt;
+  if (Game.invulnerableTimer > 0) Game.invulnerableTimer -= dt;
+
+  if (Game.comboTimer > 0) { Game.comboTimer -= dt; if (Game.comboTimer <= 0) Game.combo = 0; }
+
+  // Modes
+  if (Game.mode === 'sprint') {
+    Game.timeLeft -= dt;
+    const sec = Math.ceil(Game.timeLeft);
+    if (sec <= 10 && sec !== Game.lastTickSec && sec > 0) { Game.lastTickSec = sec; audio.playTick(false); haptic(12); }
+    if (Game.timeLeft <= 0) { Game.timeLeft = 0; updateHUD(true); endRun('time'); return; }
+    if (Game.nextCheckpoint - Game.distance < TOTAL_DEPTH - 30) {
+      const z = Game.nextCheckpoint - Game.distance;
+      if (z > 20) registerObstacle(createCheckpoint(), z);
+      Game.nextCheckpoint += 300;
+    }
+  } else if (Game.elapsedTime - Game.lastDamageTime > 3 && Game.shield > 0) {
+    Game.shield = Math.min(100, Game.shield + 4 * dt);
+  }
+
+  // Anxiety layer: heartbeat under 35%, alarm under 15%
+  if (Game.shield < 35) {
+    Game.hbTimer -= dt;
+    if (Game.hbTimer <= 0) { audio.playHeartbeat(); Game.hbTimer = 0.42 + 0.5 * (Game.shield / 35); }
+    if (Game.shield < 15) {
+      Game.alarmTimer -= dt;
+      if (Game.alarmTimer <= 0) { audio.playAlarm(); Game.alarmTimer = 1.1; }
+    }
+  }
+
+  audio.setThrottle(Game.speed / tier.boost, isAccel, Game.boostTimer > 0);
+  updateVehicleAndCamera(dt, steer, isAccel, effMax, deltaDist);
+
+  // Tunnel scroll
+  const off = (Game.distance * 0.065) % 1;
+  TUBE_TEX[currentBiomeIdx].offset.y = off;
+  if (Trans.active) TUBE_TEX[Trans.from].offset.y = off;
+
+  // Light streaks
+  const sOp = clamp01((Game.speed - 430) / 260) * 0.75;
+  streakMat.opacity = sOp;
+  streakMesh.visible = sOp > 0.01;
+  if (streakMesh.visible) {
+    const stretch = 1 + Game.speed / 150;
+    for (let i = 0; i < STREAK_COUNT; i++) {
+      const s = streakData[i];
+      s.z -= deltaDist * 1.35;
+      if (s.z < 4) s.z += TOTAL_DEPTH;
+      _dummy.position.set(Math.sin(s.ang) * s.rad, -Math.cos(s.ang) * s.rad, -s.z);
+      _dummy.scale.set(1, 1, stretch);
+      _dummy.updateMatrix();
+      streakMesh.setMatrixAt(i, _dummy.matrix);
+    }
+    streakMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // Obstacles
+  let warn = false;
+  const warnWindow = speedMPS * (IS_TOUCH ? 1.9 : 1.2) + 14;
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const obs = obstacles[i];
+    const ud = obs.userData;
+    ud.prevZ = ud.z;
+    ud.z -= deltaDist;
+    obs.position.z = -ud.z;
+
+    if (ud.z <= 3.0) { removeObstacle(i); continue; }
+    if (!ud.collected || ud.kind !== 'pickup' || ud.type === 'boost') obs.visible = ud.z < TOTAL_DEPTH - 4;
+
+    switch (ud.type) {
+      case 'coin': ud.coin.rotation.y += dt * 4.5; break;
+      case 'shield': ud.prism.rotation.y += dt * 3.5; break;
+      case 'propeller':
+      case 'iris':
+      case 'sweeper': obs.rotation.z += ud.spinSpeed * dt; break;
+      case 'swing': obs.rotation.z = swingAngleAt(ud, Game.elapsedTime); break;
+      case 'pulseGate': {
+        const on = pulseGateActiveAt(ud, Game.elapsedTime);
+        if (on !== ud.lastOn) {
+          ud.lastOn = on;
+          ud.beamMat.opacity = on ? 1 : 0.12;
+          ud.chevMat.opacity = on ? 1 : 0.1;
+          ud.glowMat.opacity = on ? 0.32 : 0;
+        }
+        break;
+      }
+    }
+
+    processObstacleCollision(obs, dt);
+
+    if (!warn && ud.kind === 'hazard' && !ud.collected &&
+        (ud.type === 'propeller' || ud.type === 'iris' || ud.type === 'funnel' ||
+         ud.type === 'sweeper' || ud.type === 'swing' || ud.type === 'pulseGate') &&
+        ud.z > CAR_Z_NEAR && ud.z < warnWindow) warn = true;
+  }
+
+  if (warn !== beaconShown) {
+    beaconShown = warn;
+    document.getElementById('hazard-beacon').classList.toggle('show', warn);
+    if (warn) audio.playWarn();
+  }
+
+  spawnCursor -= deltaDist;
+  fillTunnel();
+
+  Game.hudAcc += dt;
+  if (Game.hudAcc >= 0.066) { Game.hudAcc = 0; updateHUD(false); }
+}
+
+function updateVehicleAndCamera(dt, steer, isAccel, effMax, deltaDist) {
+  const car = playerBatmobile, ud = car.userData;
+  car.position.set(Math.sin(Game.angle) * CAR_RADIUS, -Math.cos(Game.angle) * CAR_RADIUS, -CAR_Z);
+  car.rotation.z = Game.angle - steer * 0.35;
+  car.rotation.x = (Game.speed / effMax) * 0.08;
+
+  // Blink while invulnerable after a hit
+  car.visible = Game.invulnerableTimer <= 0 || (Math.floor(Game.invulnerableTimer * 14) % 2 === 0);
+
+  const spin = deltaDist * 3.5;
+  for (const w of ud.wheels) w.rotation.x += spin;
+
+  const boosting = Game.boostTimer > 0;
+  const flameLen = (boosting ? 2.6 : (isAccel ? 1.5 : 1.0)) + Math.random() * 0.3;
+  ud.flame.scale.set(boosting ? 1.3 : 1, boosting ? 1.3 : 1, flameLen);
+  ud.coreFlame.scale.set(1, 1, flameLen * 0.85);
+  ud.flameMat.color.copy(boosting ? NITRO_COLOR : curPrimary);
+
+  // Chase camera rolls with the car
+  camAngle += wrapPI(Game.angle - camAngle) * Math.min(1, dt * 11);
+  const camR = CAR_RADIUS * 0.58;
+  camera.position.set(Math.sin(camAngle) * camR, -Math.cos(camAngle) * camR, 0);
+  camera.up.set(-Math.sin(camAngle), Math.cos(camAngle), 0);
+  camera.lookAt(car.position.x * 0.65, car.position.y * 0.65, -55);
+
+  let shake = 0;
+  if (Game.screenShake > 0) { Game.screenShake -= dt; shake += Math.max(0, Game.screenShake) * 1.8; }
+  if (Game.speed > 500) shake += 0.05 * clamp01((Game.speed - 500) / 250);
+  if (shake > 0) {
+    camera.position.x += (Math.random() - 0.5) * shake;
+    camera.position.y += (Math.random() - 0.5) * shake;
+  }
+
+  Game.fovPunch *= Math.exp(-dt * 5.5);
+  const fovT = clamp01((Game.speed - 300) / 280);
+  const targetFov = baseFov() + speedFovGain() * fovT + Game.fovPunch;
+  const newFov = lerp(camera.fov, targetFov, Math.min(1, dt * 6));
+  if (Math.abs(newFov - camera.fov) > 0.01) { camera.fov = newFov; camera.updateProjectionMatrix(); }
+}
+
+function stepCountdown(dt) {
+  Game.countdown -= dt;
+  const n = Math.ceil(Game.countdown);
+  if (n !== Game.cdShown) {
+    Game.cdShown = n;
+    const el = document.getElementById('countdown');
+    el.textContent = n > 0 ? String(n) : 'GO!';
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    audio.playTick(n <= 0);
+    haptic(n <= 0 ? 40 : 15);
+    if (n <= 0) { Game.countdown = 0; Game.speed = TIERS[Game.tier].base; }
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 13: HUD & FEEDBACK
+// ═══════════════════════════════════════════════════════════
+const el = id => document.getElementById(id);
+const hud = {
+  speed: el('hud-speed'), dist: el('hud-distance'), score: el('hud-score'), shield: el('hud-shield'), coins: el('hud-coins'),
+  timer: el('hud-timer'), combo: el('combo-tag'), speedVig: el('speed-vignette'), dangerVig: el('danger-vignette')
+};
+const H = {}; // last-written values → DOM only touched on change
+function setIf(key, val, fn) { if (H[key] !== val) { H[key] = val; fn(val); } }
+
+function updateHUD(force) {
+  if (force) for (const k in H) delete H[k];
+  setIf('speed', Math.floor(Game.speed), v => { hud.speed.textContent = v; });
+  setIf('dist', Math.floor(Game.distance), v => { hud.dist.textContent = v + ' m'; });
+  setIf('score', Game.score, v => { hud.score.textContent = v.toLocaleString(); });
+  setIf('shield', Math.round(Game.shield), v => { hud.shield.style.transform = `scaleX(${v / 100})`; });
+  setIf('shieldDanger', Game.shield < 30, v => hud.shield.classList.toggle('danger', v));
+  setIf('coins', Game.coins, v => { hud.coins.textContent = '💎 ' + v; });
+  setIf('dangerVig', Game.shield < 35, v => hud.dangerVig.classList.toggle('on', v));
+  setIf('combo', Game.combo, v => { hud.combo.textContent = 'COMBO x' + v; hud.combo.classList.toggle('on', v > 1); });
+  setIf('speedVig', Math.round(clamp01((Game.speed - 420) / 320) * 20) / 20, v => { hud.speedVig.style.opacity = v * 0.85; });
+  // Nitro ready → speed readout glows gold (no button needed on touch)
+  setIf('nitro', Game.boostTimer <= 0 && Game.shield >= 15, v => { hud.speed.style.textShadow = v ? '0 0 16px #ffe600' : ''; });
+
+  const sprint = Game.mode === 'sprint';
+  const low = sprint && Game.timeLeft < 15;
+  setIf('redline', low, v => hud.speed.classList.toggle('redline', v));
+  if (sprint) {
+    setIf('timer', Math.ceil(Game.timeLeft), v => { hud.timer.textContent = v; });
+    setIf('timerDanger', low, v => hud.timer.classList.toggle('danger', v));
+  }
+}
+
+function flashClass(id, cls, ms) {
+  const e = el(id);
+  e.classList.add(cls);
+  clearTimeout(e._t);
+  e._t = setTimeout(() => e.classList.remove(cls), ms);
+}
+
+function showActionAlert(text, color) {
+  const a = el('action-alert');
+  a.textContent = text;
+  a.style.color = color;
+  a.style.textShadow = `0 0 16px ${color}`;
+  a.classList.add('active');
+  clearTimeout(showActionAlert._t);
+  showActionAlert._t = setTimeout(() => a.classList.remove('active'), 850);
+}
+
+function handleImpact(damage) {
+  if (Game.invulnerableTimer > 0) return;
+  Game.shield -= damage;
+  Game.speed *= 0.8;
+  Game.screenShake = 0.5;
+  Game.invulnerableTimer = 1.0;
+  Game.lastDamageTime = Game.elapsedTime;
+  Game.combo = 0; Game.comboTimer = 0;
+  audio.playHit();
+  haptic(70);
+  flashClass('impact-flash', 'hit', 120);
+  if (Game.shield <= 0) { Game.shield = 0; updateHUD(true); endRun('crash'); return; }
+  updateHUD(true);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 14: FLOW — MENU, START, PAUSE, GAME OVER
+// ═══════════════════════════════════════════════════════════
+function wireSelectRow(rowId, attr, onPick) {
+  const row = el(rowId);
+  row.addEventListener('click', e => {
+    const btn = e.target.closest('.select-btn');
+    if (!btn) return;
+    for (const b of row.querySelectorAll('.select-btn')) b.classList.remove('selected');
+    btn.classList.add('selected');
+    onPick(btn.dataset[attr]);
+  });
+}
+wireSelectRow('mode-row', 'mode', v => { Game.mode = v; });
+wireSelectRow('tier-row', 'tier', v => { Game.tier = v; });
+
+function setPlayingUI(on) {
+  el('hud-layer').classList.toggle('active', on);
+  if (IS_TOUCH) el('touch-zones').classList.toggle('active', on);
+}
+
+function resetWorld() {
+  clearObstacles();
+  spawnCursor = 70;
+  currentBiomeIdx = 0;
+  setBiomeInstant(0);
+  camAngle = 0;
+  camera.up.set(0, 1, 0);
+  camera.fov = baseFov();
+  camera.updateProjectionMatrix();
+  for (const t of TUBE_TEX) t.offset.y = 0;
+  streakMat.opacity = 0; streakMesh.visible = false;
+  beaconShown = false;
+  el('hazard-beacon').classList.remove('show');
+  el('action-alert').classList.remove('active');
+  el('zone-announcement').classList.remove('show');
+  el('danger-vignette').classList.remove('on');
+  el('speed-vignette').style.opacity = 0;
+  releaseAllInput();
+}
+
+function startGame() {
+  const tier = TIERS[Game.tier];
+  Game.runToken++;
+  Object.assign(Game, {
+    active: true, paused: false, angle: 0, prevAngle: 0, distance: 0, score: 0, shield: 100,
+    elapsedTime: 0, speed: tier.base * 0.3, boostTimer: 0, screenShake: 0,
+    invulnerableTimer: 0, lastDamageTime: -99, alarmTimer: 0, hbTimer: 0, fovPunch: 0,
+    countdown: 3.0, cdShown: -1, combo: 0, comboTimer: 0, shaves: 0,
+    timeLeft: 90, nextCheckpoint: 300, lastTickSec: -1, hudAcc: 0, coins: 0
+  });
+  Game.bestScore = readBest(Game.mode);
+
+  initCoach();
+  resetWorld();
+  fillTunnel();
+  audio.init();
+
+  el('timer-capsule').classList.toggle('active', Game.mode === 'sprint');
+  el('menu-screen').classList.add('hidden');
+  el('gameover-screen').classList.add('hidden');
+  el('pause-screen').classList.add('hidden');
+  setPlayingUI(true);
+  updateHUD(true);
+}
+
+function setPaused(p) {
+  if (!Game.active || Game.paused === p) return;
+  Game.paused = p;
+  el('pause-screen').classList.toggle('hidden', !p);
+  if (p) { audio.stop(); releaseAllInput(); } else { audio.resume(); }
+}
+
+function goToMenu() {
+  Game.active = false; Game.paused = false;
+  audio.stop();
+  setPlayingUI(false);
+  ['pause-screen', 'gameover-screen'].forEach(id => el(id).classList.add('hidden'));
+  el('menu-screen').classList.remove('hidden');
+  updateMenuBest();
+}
+
+function endRun(reason) {
+  Game.active = false;
+  audio.stop();
+  el('hazard-beacon').classList.remove('show');
+  beaconShown = false;
+
+  const isNew = Game.score > Game.bestScore;
+  if (isNew) { Game.bestScore = Game.score; writeBest(Game.mode, Game.score); }
+
+  // Brief beat on the crash before the results card
+  const token = Game.runToken;
+  setTimeout(() => {
+    if (token !== Game.runToken || Game.active) return;
+    setPlayingUI(false);
+    el('gameover-title').textContent = reason === 'time' ? 'TIME UP' : 'CRASHED';
+    el('res-dist').textContent = Math.floor(Game.distance) + ' m';
+    el('res-score').textContent = Game.score.toLocaleString();
+    el('res-shaves').textContent = Game.shaves;
+    el('res-best').textContent = Game.bestScore.toLocaleString();
+    el('new-best').classList.toggle('show', isNew && Game.score > 0);
+    el('gameover-screen').classList.remove('hidden');
+  }, reason === 'crash' ? 650 : 250);
+}
+
+// ── In-game coach: teaches the controls while you play (never blocks the start) ──
+const COACH_KEY = 'piperiders_coach_v2';
+function coachSeen() { try { return localStorage.getItem(COACH_KEY) === '1'; } catch (e) { return true; } }
+function markCoachSeen() { try { localStorage.setItem(COACH_KEY, '1'); } catch (e) {} }
+const Coach = { on: false, shown: false, step: 0, t: 0, steerT: 0, speedT: 0, coinBase: 0, forced: false };
+const COACH_STEPS = [
+  { text: 'Drag left or right to steer', sub: 'one finger, anywhere on screen', limit: 14, done: () => Coach.steerT > 0.6 },
+  { text: 'Drag up to speed up · down to brake', sub: '', limit: 12, done: () => Coach.speedT > 0.6 },
+  { text: 'Steer into the 💎 to collect it', sub: 'every 10 coins restores shield', limit: 16, done: () => Game.coins > Coach.coinBase },
+  { text: 'Double-tap for nitro', sub: 'costs shield · big speed boost', limit: 15, done: () => Game.boostTimer > 0 },
+  { text: "You're ready — watch for red hazards", sub: '', limit: 2.2, done: () => false }
+];
+function setCoachText(s) {
+  const c = el('coach');
+  if (!s) { c.classList.remove('show'); return; }
+  c.innerHTML = s.text + (s.sub ? `<small>${s.sub}</small>` : '');
+  c.classList.add('show');
+}
+function initCoach() {
+  Coach.on = Coach.forced || !coachSeen();
+  Coach.forced = false;
+  Coach.shown = false; Coach.step = 0; Coach.t = 0; Coach.steerT = 0; Coach.speedT = 0; Coach.coinBase = 0;
+  setCoachText(null);
+}
+function coachAdvance() {
+  Coach.step++; Coach.t = 0; Coach.steerT = 0; Coach.speedT = 0; Coach.coinBase = Game.coins;
+  if (Coach.step >= COACH_STEPS.length) { Coach.on = false; setCoachText(null); markCoachSeen(); }
+  else setCoachText(COACH_STEPS[Coach.step]);
+}
+// Called from the main update, so prompts only appear after the countdown
+function updateCoach(dt, steer, pushing) {
+  if (!Coach.on) return;
+  if (!Coach.shown) { Coach.shown = true; setCoachText(COACH_STEPS[Coach.step]); }
+  Coach.t += dt;
+  if (Math.abs(steer) > 0.3) Coach.steerT += dt;
+  if (pushing) Coach.speedT += dt;
+  const s = COACH_STEPS[Coach.step];
+  if (s.done() || Coach.t > s.limit) coachAdvance();
+}
+// While learning, only coins and shields spawn, so the first minute has no hazards
+function coachPattern() { return (Coach.on && Coach.step < 4) ? 'coinSpiral' : pickPattern(); }
+
+el('btn-howto').addEventListener('click', () => { Coach.forced = true; startGame(); });
+
+el('btn-start').addEventListener('click', startGame);
+el('btn-restart').addEventListener('click', startGame);
+el('btn-menu').addEventListener('click', goToMenu);
+el('btn-resume').addEventListener('click', () => setPaused(false));
+el('btn-pause-restart').addEventListener('click', startGame);
+el('btn-pause-menu').addEventListener('click', goToMenu);
+updateMenuBest();
+
+
+// ═══════════════════════════════════════════════════════════
+// SECTION 15: WARM-UP (no first-appearance stutter) & MAIN LOOP
+// ═══════════════════════════════════════════════════════════
+function warmUp() {
+  // Upload every biome texture once
+  for (const t of TUBE_TEX) { tunnelA.material.map = t; renderer.render(scene, camera); }
+  tunnelA.material.map = TUBE_TEX[0];
+  // Compile every obstacle program & upload every shared buffer once
+  const samples = [
+    createLaserGate(0), createPulseGate(0, 0, 1.7), createPropeller(2, 1), createPropeller(3, 1),
+    createCurvedWall(0), createIris(1), createFunnel(0, 0), createFunnel(0, 1), createFunnel(0, 2),
+    createSpikeBlock(0), createGoldCoin(0), createShieldCell(0), createNitroPad(0), createCheckpoint()
+  ];
+  samples.forEach((s, i) => { s.position.z = -30 - i * 4; scene.add(s); });
+  streakMesh.visible = true; tunnelB.visible = true;
+  renderer.compile(scene, camera);
+  renderer.render(scene, camera);
+  samples.forEach(s => { scene.remove(s); if (s.userData.ownMats) s.userData.ownMats.forEach(m => m.dispose()); });
+  streakMesh.visible = false; tunnelB.visible = false;
+}
+
+// Adaptive resolution: drop pixel ratio when frames run long, recover when smooth
+function perfTick(rawDt) {
+  if (!Game.active || Game.paused) { Perf.acc = 0; Perf.frames = 0; return; }
+  Perf.acc += rawDt; Perf.frames++;
+  if (Perf.acc < 1) return;
+  const avg = Perf.acc / Perf.frames;
+  Perf.acc = 0; Perf.frames = 0;
+  if (avg > 1 / 45 && Perf.ratio > Perf.min) {
+    Perf.ratio = Math.max(Perf.min, Math.round((Perf.ratio - 0.25) * 100) / 100);
+    renderer.setPixelRatio(Perf.ratio);
+    Perf.good = 0;
+  } else if (avg < 1 / 56) {
+    if (++Perf.good >= 4 && Perf.ratio < Perf.max) {
+      Perf.ratio = Math.min(Perf.max, Math.round((Perf.ratio + 0.1) * 100) / 100);
+      renderer.setPixelRatio(Perf.ratio);
+      Perf.good = 0;
+    }
+  } else Perf.good = 0;
+}
+
+// Idle pose for the menu
+playerBatmobile.position.set(0, -CAR_RADIUS, -CAR_Z);
+camera.position.set(0, -CAR_RADIUS * 0.58, 0);
+camera.lookAt(0, -CAR_RADIUS * 0.65, -55);
+setBiomeInstant(0);
+warmUp();
+
+let lastTime = performance.now();
+let pausedFrameDrawn = false;
+function animate(time) {
+  requestAnimationFrame(animate);
+  const raw = (time - lastTime) / 1000;
+  lastTime = time;
+  const dt = Math.min(Math.max(raw, 0), 0.05);
+
+  perfTick(raw);
+  update(dt);
+
+  if (Game.paused) { if (pausedFrameDrawn) return; pausedFrameDrawn = true; }
+  else pausedFrameDrawn = false;
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "appId": "com.piperider.game",
+  "appName": "Pipe Riders",
+  "webDir": "web",
+  "backgroundColor": "#020208",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#020208"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#020208",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "DARK",
+      "backgroundColor": "#020208"
+    }
+  }
+}
