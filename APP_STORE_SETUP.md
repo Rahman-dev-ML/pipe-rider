@@ -8,7 +8,7 @@
   - Name: Tube Riders (or available variant)  
   - Bundle ID: com.piperider.game  
   - SKU: piperider-ios  
-- [ ] Copy **Apple ID** (numbers) → set `APP_STORE_APPLE_ID` in `codemagic.yaml` → commit
+- [x] Apple ID `6837967243` set in `codemagic.yaml`
 
 ## 2. Codemagic
 
